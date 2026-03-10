@@ -1,0 +1,67 @@
+from __future__ import annotations
+
+import hashlib
+import hmac
+import json
+import secrets
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
+from fastapi import HTTPException, status
+
+from app.config import get_settings
+
+
+class TicketStore:
+    def __init__(self) -> None:
+        self._consumed: set[str] = set()
+
+    def consume(self, jti: str) -> None:
+        if jti in self._consumed:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ticket already used")
+        self._consumed.add(jti)
+
+
+ticket_store = TicketStore()
+
+
+def _sign(data: bytes) -> str:
+    settings = get_settings()
+    return hmac.new(settings.ticket_secret.encode(), data, hashlib.sha256).hexdigest()
+
+
+def issue_ticket(*, sandbox_id: str, subject: str, ticket_type: str, scope: str, ttl_sec: int | None = None) -> str:
+    settings = get_settings()
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_sec or settings.ticket_ttl_sec)
+    payload = {
+        "sandbox_id": sandbox_id,
+        "sub": subject,
+        "type": ticket_type,
+        "scope": scope,
+        "exp": int(expires_at.timestamp()),
+        "jti": secrets.token_hex(16),
+    }
+    raw = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+    return f"{raw.hex()}.{_sign(raw)}"
+
+
+def verify_ticket(token: str, *, sandbox_id: str, ticket_type: str, scope: str, consume: bool = False) -> dict[str, Any]:
+    try:
+        raw_hex, signature = token.split(".", 1)
+        raw = bytes.fromhex(raw_hex)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid ticket") from exc
+
+    expected = _sign(raw)
+    if not hmac.compare_digest(signature, expected):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid ticket signature")
+
+    payload = json.loads(raw.decode())
+    if payload["sandbox_id"] != sandbox_id or payload["type"] != ticket_type or payload["scope"] != scope:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ticket scope mismatch")
+    if datetime.now(timezone.utc).timestamp() > payload["exp"]:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="ticket expired")
+    if consume:
+        ticket_store.consume(payload["jti"])
+    return payload
+
