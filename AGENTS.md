@@ -1,0 +1,54 @@
+# AGENTS.md
+
+## Project Scope
+
+This repository implements a browser sandbox platform with:
+
+- a FastAPI control plane in `apps/api-server`
+- a Docker-based runtime in `apps/sandbox-runtime`
+- a runtime image definition in `docker/runtime/Dockerfile`
+
+The source of truth for product and system design is `.docs/tech.md`.
+
+## Working Rules
+
+- Prefer small, verifiable changes over speculative refactors.
+- Keep the API contract aligned with the `/sandboxes/{sandbox_id}/...` routing model.
+- Treat the runtime container and the API server as one integrated system. Do not change one without validating the other.
+- Avoid introducing host-specific absolute paths into code, docs, tests, or examples.
+
+## Key Runtime Facts
+
+- Chromium runs inside the sandbox container under Xvfb/Openbox.
+- CDP is exposed through an internal relay on port `9223`.
+- noVNC assets are served from `/usr/share/novnc`.
+- Browser GUI actions are executed through `xdotool`.
+- Window screenshots are captured from X11 using ImageMagick `import`.
+
+## Expected Validation
+
+Before considering runtime-related work complete, run:
+
+```bash
+docker build -f docker/runtime/Dockerfile -t verge-browser-runtime:latest .
+. .venv/bin/activate
+PYTHONPATH=apps/api-server pytest tests/unit tests/integration/test_runtime_api.py
+```
+
+If Docker is unavailable, unit tests are still expected to pass.
+
+## Files Worth Reading First
+
+- `.docs/tech.md`
+- `apps/api-server/app/services/browser.py`
+- `apps/api-server/app/services/lifecycle.py`
+- `apps/api-server/app/routes/`
+- `apps/sandbox-runtime/scripts/`
+- `apps/sandbox-runtime/supervisor/supervisord.conf`
+
+## Common Pitfalls
+
+- Chromium may fail to start if profile lock files are not cleared.
+- VNC static asset paths differ by distro packaging; this repo currently uses Debian's `/usr/share/novnc`.
+- CDP and noVNC should be validated through the actual runtime image, not only through mocked tests.
+- When changing readiness logic, avoid raising hard failures during sandbox creation for transient startup conditions.
