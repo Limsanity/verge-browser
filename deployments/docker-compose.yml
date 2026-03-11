@@ -1,13 +1,24 @@
 services:
   api:
-    image: python:3.11-slim
-    working_dir: /workspace
+    build:
+      context: ..
+      dockerfile: docker/api-server.Dockerfile
+    image: verge-browser-api:latest
+    working_dir: ${PROJECT_ROOT:?set PROJECT_ROOT to the repo absolute path}
+    environment:
+      VERGE_SANDBOX_BASE_DIR: ${PROJECT_ROOT:?set PROJECT_ROOT to the repo absolute path}/.local/sandboxes
     command: >
-      sh -c "pip install -e .[dev] &&
-             uvicorn app.main:app --app-dir apps/api-server --host 0.0.0.0 --port 8000"
+      uvicorn app.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
     volumes:
-      - ..:/workspace
+      - ${PROJECT_ROOT:?set PROJECT_ROOT to the repo absolute path}:${PROJECT_ROOT:?set PROJECT_ROOT to the repo absolute path}
       - /var/run/docker.sock:/var/run/docker.sock
 
+  runtime-image:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: verge-browser-runtime:latest
+    command: ["/bin/true"]
+    profiles: ["build"]

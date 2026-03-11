@@ -22,12 +22,14 @@ Verge Browser 是一个面向智能体工作流的浏览器沙箱平台。
 
 - 运行时容器启动，包含 Chromium、Xvfb、Openbox、x11vnc、websockify 和 CDP 中继
 - 通过 API 创建沙箱
+- 持久化沙箱元数据，并在服务启动时恢复为 `STOPPED`
+- 支持复用现有工作目录的 `pause` / `resume`
 - 真实窗口截图
 - 通过 CDP 进行真实页面截图
 - 通过 `xdotool` 执行 GUI 操作
 - 基于票据的 VNC 入口，支持 noVNC 资源代理
 
-某些部分尚未达到生产级成熟度，尤其是长期生命周期管理、重启恢复语义以及更广泛的集成/E2E 覆盖率。
+某些部分尚未达到生产级成熟度，尤其是基于健康检查的生命周期流转、浏览器崩溃恢复语义以及更广泛的集成/E2E 覆盖率。
 
 ## 为何存在
 
@@ -71,7 +73,8 @@ Verge Browser 旨在通过一种运行时模型来弥合这一差距，该模型
 
 本仓库目前实现了：
 
-- 基于 Docker 运行时启动的沙箱创建/获取/删除流程
+- 基于 Docker 运行时启动的沙箱创建/获取/暂停/恢复/删除流程
+- 工作目录元数据持久化，以及停止态沙箱的启动恢复
 - 浏览器信息、视口、截图、操作、重启和 CDP 代理
 - 基于票据的 VNC 入口，支持 noVNC 资源代理
 - Shell 一次性执行和交互式 Shell 会话
@@ -111,7 +114,27 @@ uvicorn app.main:app --app-dir apps/api-server --host 0.0.0.0 --port 8000 --relo
 docker build -f docker/Dockerfile -t verge-browser-runtime:latest .
 ```
 
-### 4. 运行测试
+### 4. 使用 Docker Compose 运行完整栈
+
+API 服务本身可以跑在 Docker 里，但它需要访问宿主机 Docker daemon，因为 sandbox 是以同级容器的方式启动的。
+
+在仓库根目录执行：
+
+```bash
+export PROJECT_ROOT="$PWD"
+docker compose -f deployments/docker-compose.yml build api runtime-image
+docker compose -f deployments/docker-compose.yml up api
+```
+
+之所以需要 `PROJECT_ROOT`：
+
+- API 容器必须以和宿主机相同的绝对路径看到仓库
+- sandbox 工作目录的 bind mount 是由宿主机 Docker daemon 创建的
+- 这样 `VERGE_SANDBOX_BASE_DIR` 在容器内外都指向同一个有效路径
+
+随后 API 会监听在 [http://127.0.0.1:8000](http://127.0.0.1:8000)。
+
+### 5. 运行测试
 
 ```bash
 PYTHONPATH=apps/api-server pytest
@@ -123,7 +146,7 @@ PYTHONPATH=apps/api-server pytest
 PYTHONPATH=apps/api-server pytest -m integration
 ```
 
-### 5. 手动冒烟脚本
+### 6. 手动冒烟脚本
 
 人性化的冒烟脚本位于 [`tests/scripts`](./tests/scripts)。
 
@@ -188,7 +211,7 @@ API 遵循 [`docs/tech.md`](./docs/tech.md) 中的 `/sandboxes/{sandbox_id}/...`
 在 [`docs/tech.md`](./docs/tech.md) 中描述的完整 V1 目标之前，以下领域仍需要更深入的实现工作：
 
 - 更强的 Docker 生命周期管理和基于健康检查的状态转换
-- 生产就绪的浏览器重启和降级状态恢复
+- 生产就绪的浏览器崩溃恢复和降级状态处理
 - Shell/文件/浏览器跨功能集成覆盖
 - 更广泛的端到端和故障模式覆盖
 
@@ -198,6 +221,7 @@ API 遵循 [`docs/tech.md`](./docs/tech.md) 中的 `/sandboxes/{sandbox_id}/...`
 - API 服务器使用 FastAPI 实现。
 - WebSocket 代理围绕 CDP 和 VNC 中继用例设计。
 - 文件操作限制在沙箱工作空间根目录内。
+- 容器化 API 部署通过挂载 `/var/run/docker.sock` 来管理宿主机上的 sandbox 容器。
 - 当前实现优先考虑实用的 MVP 结构，而非过早的分布或多租户编排。
 
 ## 路线图

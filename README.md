@@ -22,12 +22,14 @@ The current codebase now includes a working runtime image and a live end-to-end 
 
 - runtime container boot with Chromium, Xvfb, Openbox, x11vnc, websockify, and a CDP relay
 - sandbox creation through the API
+- persisted sandbox metadata with startup recovery into `STOPPED`
+- pause / resume lifecycle for reusing an existing workspace
 - real window screenshots
 - real page screenshots through CDP
 - GUI action execution through `xdotool`
 - ticket-based VNC entry with noVNC asset proxying
 
-Some parts are still not production-hard yet, especially long-term lifecycle management, restart recovery semantics, and broader integration / E2E coverage.
+Some parts are still not production-hard yet, especially health-driven lifecycle transitions, browser crash recovery semantics, and broader integration / E2E coverage.
 
 ## Why This Exists
 
@@ -71,7 +73,8 @@ Client / Agent / Human
 
 The repository currently implements:
 
-- sandbox create / get / delete flow with Docker-backed runtime startup
+- sandbox create / get / pause / resume / delete flow with Docker-backed runtime startup
+- persisted workspace metadata and startup recovery for stopped sandboxes
 - browser info, viewport, screenshot, actions, restart, and CDP proxying
 - ticket-based VNC entry with noVNC asset proxying
 - shell one-shot execution and interactive shell sessions
@@ -111,7 +114,27 @@ uvicorn app.main:app --app-dir apps/api-server --host 0.0.0.0 --port 8000 --relo
 docker build -f docker/Dockerfile -t verge-browser-runtime:latest .
 ```
 
-### 4. Run tests
+### 4. Run the full stack with Docker Compose
+
+The API server can run inside Docker, but it needs access to the host Docker daemon because sandboxes are launched as sibling containers.
+
+From the repository root:
+
+```bash
+export PROJECT_ROOT="$PWD"
+docker compose -f deployments/docker-compose.yml build api runtime-image
+docker compose -f deployments/docker-compose.yml up api
+```
+
+Why `PROJECT_ROOT` is required:
+
+- the API container must see the repo at the same absolute path as the host
+- sandbox workspace bind mounts are created by the host Docker daemon
+- this keeps `VERGE_SANDBOX_BASE_DIR` valid both inside the API container and on the host
+
+The API will then be available at [http://127.0.0.1:8000](http://127.0.0.1:8000).
+
+### 5. Run tests
 
 ```bash
 PYTHONPATH=apps/api-server pytest
@@ -123,7 +146,7 @@ To include Docker-backed integration coverage:
 PYTHONPATH=apps/api-server pytest -m integration
 ```
 
-### 5. Manual smoke scripts
+### 6. Manual smoke scripts
 
 Human-friendly smoke scripts live under [`tests/scripts`](./tests/scripts).
 
@@ -188,7 +211,7 @@ Detailed endpoint documentation lives in [`docs/api.md`](./docs/api.md).
 The following areas still need deeper implementation work before the project reaches the full V1 target described in [`docs/tech.md`](./docs/tech.md):
 
 - stronger Docker lifecycle management and health-driven state transitions
-- production-ready browser restart and degraded-state recovery
+- production-ready browser crash recovery and degraded-state handling
 - shell/files/browser cross-feature integration coverage
 - broader end-to-end and failure-mode coverage
 
@@ -198,6 +221,7 @@ The following areas still need deeper implementation work before the project rea
 - The API server is implemented with FastAPI.
 - WebSocket proxying is designed around CDP and VNC relay use cases.
 - File operations are constrained to the sandbox workspace root.
+- Containerized API deployment uses Docker-outside-of-Docker via `/var/run/docker.sock`.
 - The current implementation favors a practical MVP structure over premature distribution or multi-tenant orchestration.
 
 ## Roadmap
