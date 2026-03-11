@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  base: "/admin/",
+  base: "/admin",
   plugins: [react()],
   build: {
     outDir: path.resolve(__dirname, "../api-server/app/static/admin"),
