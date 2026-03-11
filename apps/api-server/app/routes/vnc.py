@@ -1,6 +1,8 @@
 import asyncio
 import secrets
+from contextlib import suppress
 from datetime import datetime, timedelta, timezone
+from threading import Lock
 
 import httpx
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect
@@ -12,26 +14,44 @@ from app.deps import get_current_subject, require_sandbox
 
 router = APIRouter(prefix="/sandboxes/{sandbox_id}/vnc", tags=["vnc"])
 _vnc_sessions: dict[str, dict[str, object]] = {}
+_vnc_sessions_lock = Lock()
+
+
+def _prune_vnc_sessions(now: datetime | None = None) -> None:
+    current = now or datetime.now(timezone.utc)
+    expired = [
+        session_id
+        for session_id, session in _vnc_sessions.items()
+        if current > session["expires_at"]
+    ]
+    for session_id in expired:
+        _vnc_sessions.pop(session_id, None)
 
 
 def _create_vnc_session(sandbox_id: str) -> str:
     session_id = secrets.token_urlsafe(24)
-    _vnc_sessions[session_id] = {
-        "sandbox_id": sandbox_id,
-        "expires_at": datetime.now(timezone.utc) + timedelta(minutes=10),
-    }
+    with _vnc_sessions_lock:
+        _prune_vnc_sessions()
+        _vnc_sessions[session_id] = {
+            "sandbox_id": sandbox_id,
+            "expires_at": datetime.now(timezone.utc) + timedelta(minutes=10),
+        }
     return session_id
 
 
 def _validate_vnc_session(session_id: str | None, sandbox_id: str) -> None:
     if not session_id:
         raise HTTPException(status_code=401, detail="missing vnc session")
-    session = _vnc_sessions.get(session_id)
-    if session is None or session["sandbox_id"] != sandbox_id:
-        raise HTTPException(status_code=403, detail="invalid vnc session")
-    if datetime.now(timezone.utc) > session["expires_at"]:
-        _vnc_sessions.pop(session_id, None)
-        raise HTTPException(status_code=401, detail="expired vnc session")
+    with _vnc_sessions_lock:
+        session = _vnc_sessions.get(session_id)
+        if session is None or session["sandbox_id"] != sandbox_id:
+            _prune_vnc_sessions()
+            raise HTTPException(status_code=403, detail="invalid vnc session")
+        if datetime.now(timezone.utc) > session["expires_at"]:
+            _vnc_sessions.pop(session_id, None)
+            _prune_vnc_sessions()
+            raise HTTPException(status_code=401, detail="expired vnc session")
+        _prune_vnc_sessions()
 
 
 @router.post("/tickets")
@@ -107,7 +127,18 @@ async def vnc_websockify_proxy(websocket: WebSocket, sandbox_id: str) -> None:
                     else:
                         await websocket.send_text(message)
 
-            await asyncio.gather(client_to_upstream(), upstream_to_client())
+            client_task = asyncio.create_task(client_to_upstream())
+            upstream_task = asyncio.create_task(upstream_to_client())
+            done, pending = await asyncio.wait(
+                {client_task, upstream_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in pending:
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+            for task in done:
+                task.result()
     except WebSocketDisconnect:
         return
     except Exception:

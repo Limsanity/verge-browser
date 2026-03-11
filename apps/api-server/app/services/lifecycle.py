@@ -72,17 +72,24 @@ class SandboxLifecycleService:
             shutil.rmtree(root, ignore_errors=True)
         return True
 
-    def restart_browser(self, sandbox_id: str) -> bool:
+    async def restart_browser(self, sandbox_id: str) -> bool:
         sandbox = registry.get(sandbox_id)
         if sandbox is None or not sandbox.container_id:
             return False
         sandbox.status = SandboxStatus.STARTING
         sandbox.updated_at = utcnow()
-        ok = docker_adapter.restart_browser(sandbox.container_id)
-        sandbox.status = SandboxStatus.RUNNING if ok else SandboxStatus.DEGRADED
-        sandbox.updated_at = utcnow()
+        sandbox.metadata.pop("runtime_error", None)
         registry.put(sandbox)
-        return ok
+        ok = docker_adapter.restart_browser(sandbox.container_id)
+        if not ok:
+            sandbox.status = SandboxStatus.DEGRADED
+            sandbox.updated_at = utcnow()
+            registry.put(sandbox)
+            return False
+        settings = get_settings()
+        await self._wait_until_ready(sandbox_id, timeout_sec=settings.sandbox_start_timeout_sec)
+        refreshed = registry.get(sandbox_id)
+        return refreshed is not None and refreshed.status == SandboxStatus.RUNNING
 
     async def _wait_until_ready(self, sandbox_id: str, *, timeout_sec: int) -> None:
         deadline = asyncio.get_running_loop().time() + timeout_sec

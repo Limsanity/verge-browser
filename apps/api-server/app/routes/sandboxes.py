@@ -75,5 +75,5 @@ async def restart_browser(
     sandbox=Depends(require_sandbox),
 ) -> dict[str, object]:
     del sandbox, payload
-    ok = lifecycle_service.restart_browser(sandbox_id)
+    ok = await lifecycle_service.restart_browser(sandbox_id)
     return {"ok": ok, "level": "hard"}

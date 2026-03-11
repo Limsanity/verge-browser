@@ -1,0 +1,36 @@
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+
+import pytest
+from fastapi import HTTPException
+
+from app.routes import vnc
+
+
+def test_create_vnc_session_prunes_expired_entries() -> None:
+    now = datetime.now(timezone.utc)
+    vnc._vnc_sessions["expired"] = {
+        "sandbox_id": "sb_old",
+        "expires_at": now - timedelta(seconds=1),
+    }
+
+    session_id = vnc._create_vnc_session("sb_new")
+
+    assert session_id in vnc._vnc_sessions
+    assert "expired" not in vnc._vnc_sessions
+    vnc._vnc_sessions.clear()
+
+
+def test_validate_vnc_session_rejects_expired_session() -> None:
+    vnc._vnc_sessions["expired"] = {
+        "sandbox_id": "sb_1",
+        "expires_at": datetime.now(timezone.utc) - timedelta(seconds=1),
+    }
+
+    with pytest.raises(HTTPException) as exc:
+        vnc._validate_vnc_session("expired", "sb_1")
+
+    assert exc.value.status_code == 401
+    assert "expired" not in vnc._vnc_sessions
+    vnc._vnc_sessions.clear()

@@ -13,3 +13,4 @@ __pycache__/
 *.swo
 *.egg-info/
 dist/
+docs/spec/

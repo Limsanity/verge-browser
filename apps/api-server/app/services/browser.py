@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import logging
 from typing import Any
 from urllib.parse import urlparse, urlunparse
 
@@ -14,10 +15,13 @@ from app.models.sandbox import SandboxRecord
 from app.schemas.browser import BrowserAction, BrowserActionType, BrowserActionsRequest, BrowserActionsResponse, ScreenshotEnvelope, ScreenshotMetadata, ScreenshotType
 from app.services.docker_adapter import docker_adapter
 
+logger = logging.getLogger(__name__)
+
 
 class CdpClient:
-    def __init__(self, ws_url: str) -> None:
+    def __init__(self, ws_url: str, *, timeout_sec: float = 5.0) -> None:
         self.ws_url = ws_url
+        self.timeout_sec = timeout_sec
         self._counter = 0
         self._ws = None
 
@@ -39,7 +43,10 @@ class CdpClient:
             payload["sessionId"] = session_id
         await self._ws.send(json.dumps(payload))
         while True:
-            response = json.loads(await self._ws.recv())
+            try:
+                response = json.loads(await asyncio.wait_for(self._ws.recv(), timeout=self.timeout_sec))
+            except TimeoutError as exc:
+                raise RuntimeError(f"cdp call timed out: {method}") from exc
             if response.get("id") != self._counter:
                 continue
             if "error" in response:
@@ -49,6 +56,12 @@ class CdpClient:
 
 class BrowserService:
     async def browser_version(self, sandbox: SandboxRecord) -> dict:
+        return await self._browser_version_payload(sandbox, normalize_ws_url=True)
+
+    async def upstream_browser_version(self, sandbox: SandboxRecord) -> dict:
+        return await self._browser_version_payload(sandbox, normalize_ws_url=False)
+
+    async def _browser_version_payload(self, sandbox: SandboxRecord, *, normalize_ws_url: bool) -> dict:
         url = f"http://{sandbox.runtime.host}:{sandbox.runtime.cdp_port}/json/version"
         try:
             async with httpx.AsyncClient(timeout=2.0) as client:
@@ -56,8 +69,9 @@ class BrowserService:
                 response.raise_for_status()
             payload = response.json()
         except Exception:
+            logger.warning("browser version probe via HTTP failed for sandbox %s; falling back to exec", sandbox.id, exc_info=True)
             payload = self._browser_version_via_exec(sandbox)
-        if payload.get("webSocketDebuggerUrl"):
+        if normalize_ws_url and payload.get("webSocketDebuggerUrl"):
             payload["webSocketDebuggerUrl"] = self._normalize_cdp_ws_url(sandbox, payload["webSocketDebuggerUrl"])
         return payload
 
@@ -132,7 +146,7 @@ class BrowserService:
             raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "action execution failed")
 
     async def _page_screenshot(self, sandbox: SandboxRecord, *, target_id: str | None, image_format: str) -> bytes:
-        version = await self.browser_version(sandbox)
+        version = await self.upstream_browser_version(sandbox)
         ws_url = version.get("webSocketDebuggerUrl")
         if not ws_url:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="page screenshot unavailable")

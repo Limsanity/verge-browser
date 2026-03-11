@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import secrets
+from threading import Lock
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -14,12 +15,22 @@ from app.config import get_settings
 
 class TicketStore:
     def __init__(self) -> None:
-        self._consumed: set[str] = set()
+        self._consumed: dict[str, int] = {}
+        self._lock = Lock()
 
-    def consume(self, jti: str) -> None:
-        if jti in self._consumed:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ticket already used")
-        self._consumed.add(jti)
+    def consume(self, jti: str, exp: int) -> None:
+        now = int(datetime.now(timezone.utc).timestamp())
+        with self._lock:
+            self._prune_locked(now)
+            existing_exp = self._consumed.get(jti)
+            if existing_exp is not None and existing_exp >= now:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ticket already used")
+            self._consumed[jti] = exp
+
+    def _prune_locked(self, now: int) -> None:
+        expired = [jti for jti, exp in self._consumed.items() if exp < now]
+        for jti in expired:
+            self._consumed.pop(jti, None)
 
 
 ticket_store = TicketStore()
@@ -62,6 +73,5 @@ def verify_ticket(token: str, *, sandbox_id: str, ticket_type: str, scope: str, 
     if datetime.now(timezone.utc).timestamp() > payload["exp"]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="ticket expired")
     if consume:
-        ticket_store.consume(payload["jti"])
+        ticket_store.consume(payload["jti"], payload["exp"])
     return payload
-

@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import suppress
 
 from fastapi import APIRouter, Depends, Query, Request, WebSocket, WebSocketDisconnect
 import websockets
@@ -58,7 +59,7 @@ async def cdp_browser_proxy(websocket: WebSocket, sandbox_id: str) -> None:
     sandbox = require_sandbox(sandbox_id)
     await get_ws_subject(websocket)
     await websocket.accept()
-    version = await browser_service.browser_version(sandbox)
+    version = await browser_service.upstream_browser_version(sandbox)
     upstream_url = version.get("webSocketDebuggerUrl")
     if not upstream_url:
         await websocket.close(code=1011, reason="browser unavailable")
@@ -83,7 +84,18 @@ async def cdp_browser_proxy(websocket: WebSocket, sandbox_id: str) -> None:
                     else:
                         await websocket.send_text(message)
 
-            await asyncio.gather(client_to_upstream(), upstream_to_client())
+            client_task = asyncio.create_task(client_to_upstream())
+            upstream_task = asyncio.create_task(upstream_to_client())
+            done, pending = await asyncio.wait(
+                {client_task, upstream_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in pending:
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+            for task in done:
+                task.result()
     except WebSocketDisconnect:
         return
     except Exception:

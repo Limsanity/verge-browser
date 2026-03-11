@@ -26,6 +26,7 @@ class InteractiveShellSession:
 class ShellService:
     def __init__(self) -> None:
         self._sessions: dict[str, InteractiveShellSession] = {}
+        self._sessions_lock = asyncio.Lock()
 
     async def exec(self, sandbox: SandboxRecord, req: ShellExecRequest) -> ShellExecResponse:
         settings = get_settings()
@@ -84,27 +85,32 @@ class ShellService:
             stderr=asyncio.subprocess.STDOUT,
         )
         session.reader_task = asyncio.create_task(self._pump_output(session))
-        self._sessions[session_id] = session
+        async with self._sessions_lock:
+            self._sessions[session_id] = session
         return session
 
-    def get_session(self, session_id: str) -> InteractiveShellSession | None:
-        return self._sessions.get(session_id)
+    async def get_session(self, session_id: str) -> InteractiveShellSession | None:
+        async with self._sessions_lock:
+            return self._sessions.get(session_id)
 
     async def send_input(self, session_id: str, data: str) -> None:
-        session = self._sessions.get(session_id)
+        async with self._sessions_lock:
+            session = self._sessions.get(session_id)
         if session is None or session.proc is None or session.proc.stdin is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="shell session not found")
         session.proc.stdin.write(data.encode())
         await session.proc.stdin.drain()
 
     async def recv_output(self, session_id: str) -> bytes:
-        session = self._sessions.get(session_id)
+        async with self._sessions_lock:
+            session = self._sessions.get(session_id)
         if session is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="shell session not found")
         return await session.output_queue.get()
 
     async def close_session(self, session_id: str) -> None:
-        session = self._sessions.pop(session_id, None)
+        async with self._sessions_lock:
+            session = self._sessions.pop(session_id, None)
         if session is None:
             return
         if session.proc and session.proc.returncode is None:

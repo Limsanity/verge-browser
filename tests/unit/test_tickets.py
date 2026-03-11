@@ -1,7 +1,9 @@
+from concurrent.futures import ThreadPoolExecutor
+
 import pytest
 from fastapi import HTTPException
 
-from app.auth.tickets import issue_ticket, verify_ticket
+from app.auth.tickets import TicketStore, issue_ticket, verify_ticket
 
 
 def test_ticket_verify_and_consume() -> None:
@@ -11,3 +13,27 @@ def test_ticket_verify_and_consume() -> None:
     with pytest.raises(HTTPException):
         verify_ticket(ticket, sandbox_id="sb_1", ticket_type="vnc", scope="connect", consume=True)
 
+
+def test_ticket_store_rejects_concurrent_duplicate_consume() -> None:
+    store = TicketStore()
+
+    def consume() -> str:
+        try:
+            store.consume("same-jti", 4102444800)
+            return "ok"
+        except HTTPException:
+            return "duplicate"
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(lambda _: consume(), range(2)))
+
+    assert results.count("ok") == 1
+    assert results.count("duplicate") == 1
+
+
+def test_ticket_store_prunes_expired_entries() -> None:
+    store = TicketStore()
+    store.consume("expired", 1)
+    store.consume("fresh", 4102444800)
+    assert "expired" not in store._consumed
+    assert "fresh" in store._consumed
