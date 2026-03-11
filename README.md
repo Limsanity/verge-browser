@@ -1,5 +1,7 @@
 # Verge Browser
 
+English | [中文](./README.zh.md)
+
 Verge Browser is a browser sandbox platform for agents.
 
 It provides a single-session isolated runtime with:
