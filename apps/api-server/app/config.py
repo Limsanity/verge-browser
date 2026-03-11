@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     log_level: str = "info"
 
     sandbox_base_dir: Path = Field(default=Path(".local/sandboxes"))
+    admin_static_dir: Path = Field(default=Path(__file__).resolve().parent / "static" / "admin")
     workspace_subdir: str = "workspace"
     downloads_subdir: str = "downloads"
     uploads_subdir: str = "uploads"

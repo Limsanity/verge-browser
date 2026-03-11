@@ -1,7 +1,10 @@
 import pytest
 from fastapi.testclient import TestClient
+from pathlib import Path
 
+from app.config import get_settings
 from app.main import app
+from app.main import create_app
 from app.models.sandbox import SandboxStatus
 from app.services.registry import registry
 
@@ -108,3 +111,31 @@ def test_vnc_ticket_created_via_alias_works_with_canonical_entry_url() -> None:
 def test_vnc_ticket_requires_existing_sandbox() -> None:
     response = client.post("/sandboxes/sb_missing/vnc/tickets", headers=AUTH_HEADERS)
     assert response.status_code == 404
+
+
+def test_admin_console_serves_built_assets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    admin_dir = tmp_path / "admin"
+    assets_dir = admin_dir / "assets"
+    assets_dir.mkdir(parents=True)
+    (admin_dir / "index.html").write_text("<!doctype html><title>admin</title>", encoding="utf-8")
+    (assets_dir / "app.js").write_text("console.log('admin');", encoding="utf-8")
+
+    monkeypatch.setenv("VERGE_ADMIN_STATIC_DIR", str(admin_dir))
+    get_settings.cache_clear()
+    client = TestClient(create_app())
+
+    try:
+        root = client.get("/admin")
+        assert root.status_code == 200
+        assert "text/html" in root.headers["content-type"]
+        assert "<title>admin</title>" in root.text
+
+        asset = client.get("/admin/assets/app.js")
+        assert asset.status_code == 200
+        assert "console.log('admin');" in asset.text
+
+        spa_fallback = client.get("/admin/sandboxes/demo")
+        assert spa_fallback.status_code == 200
+        assert "<title>admin</title>" in spa_fallback.text
+    finally:
+        get_settings.cache_clear()

@@ -1,7 +1,10 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi import HTTPException
+from fastapi.responses import FileResponse
 
 from app.config import get_settings
 from app.routes.browser import router as browser_router
@@ -30,10 +33,42 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
 
 
+def _configure_admin_routes(app: FastAPI, admin_static_dir: Path) -> None:
+    index_file = admin_static_dir / "index.html"
+    if not index_file.is_file():
+        return
+
+    admin_root = admin_static_dir.resolve()
+
+    def _resolve_asset_path(asset_path: str) -> Path:
+        resolved = (admin_root / asset_path).resolve()
+        try:
+            resolved.relative_to(admin_root)
+        except ValueError as exc:
+            raise HTTPException(status_code=404) from exc
+        return resolved
+
+    @app.get("/admin", include_in_schema=False)
+    async def admin_index() -> FileResponse:
+        return FileResponse(index_file)
+
+    @app.get("/admin/", include_in_schema=False)
+    async def admin_index_with_slash() -> FileResponse:
+        return FileResponse(index_file)
+
+    @app.get("/admin/{asset_path:path}", include_in_schema=False)
+    async def admin_asset_or_index(asset_path: str) -> FileResponse:
+        resolved = _resolve_asset_path(asset_path)
+        if resolved.is_file():
+            return FileResponse(resolved)
+        return FileResponse(index_file)
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
 
+    _configure_admin_routes(app, settings.admin_static_dir)
     app.include_router(health_router)
     app.include_router(sandbox_router)
     app.include_router(browser_router)
