@@ -17,13 +17,46 @@
   box-sizing: border-box;
 }
 
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(180, 69, 29, 0.25);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(180, 69, 29, 0.4);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(180, 69, 29, 0.25) transparent;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
   color: var(--text);
   background:
-    radial-gradient(circle at top left, rgba(180, 69, 29, 0.18), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(32, 92, 76, 0.18), transparent 24%),
+    radial-gradient(
+      circle at top left,
+      rgba(180, 69, 29, 0.18),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(32, 92, 76, 0.18),
+      transparent 24%
+    ),
     linear-gradient(135deg, #efe7d8, #f8f4eb 48%, #ece5d8);
 }
 
@@ -63,6 +96,7 @@ input {
   max-width: 1320px;
   margin: 0 auto;
   padding: 2rem;
+
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -106,13 +140,16 @@ input {
   align-items: center;
 }
 
+.create-btn {
+  text-wrap: nowrap;
+}
+
 .grid {
   display: grid;
   grid-template-columns: 380px minmax(0, 1fr);
   gap: 1.5rem;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
 }
 
 .panel {
