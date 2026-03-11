@@ -15,7 +15,7 @@ Verge Browser 是一个面向智能体工作流的浏览器沙箱平台。
 
 ## 状态
 
-本仓库正在积极开发中。
+该平台当前已经可用于本地开发和单机部署。
 
 当前代码库包含一个可运行的运行时镜像，以及主浏览器沙箱循环的端到端控制路径：
 
@@ -28,7 +28,7 @@ Verge Browser 是一个面向智能体工作流的浏览器沙箱平台。
 - 通过 `xdotool` 执行 GUI 操作
 - 基于票据的 VNC 入口，支持 noVNC 资源代理
 
-某些部分尚未达到生产级成熟度，尤其是基于健康检查的生命周期流转、浏览器崩溃恢复语义以及更广泛的集成/E2E 覆盖率。
+当前的加固工作主要集中在基于健康检查的生命周期流转、浏览器崩溃恢复语义以及更广泛的集成 / E2E 覆盖率。
 
 ## 为何存在
 
@@ -144,9 +144,9 @@ pnpm --dir apps/admin-web dev
 
 默认访问地址为 [http://127.0.0.1:5173](http://127.0.0.1:5173)，并会把 `/sandboxes` 与 `/healthz` 代理到本地 `8000` 端口的 API。
 
-### 方式二：Docker 部署（推荐）
+### 方式二：Docker 部署
 
-完全使用 Docker 运行 API 服务和运行时。
+在 Docker 中运行 API 服务，并通过宿主机 Docker socket 管理运行时容器。
 
 ```bash
 # 构建运行时镜像（包含 Chromium、VNC 等）
@@ -158,15 +158,24 @@ docker build -f docker/api-server.Dockerfile -t verge-browser-api:latest .
 # 创建沙箱持久化目录
 mkdir -p .local/sandboxes
 
+# 对外暴露服务前请设置非默认鉴权密钥
+export VERGE_ADMIN_AUTH_TOKEN="replace-with-a-long-random-token"
+export VERGE_TICKET_SECRET="replace-with-a-long-random-ticket-secret"
+
 # 运行 API 服务器容器
 docker run -d \
   --name verge-api \
   -p 8000:8000 \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  -v "$(pwd)/.local/sandboxes:/app/.local/sandboxes" \
-  -e VERGE_SANDBOX_BASE_DIR=/app/.local/sandboxes \
+  -v "$(pwd):$(pwd)" \
+  -e VERGE_SANDBOX_BASE_DIR="$(pwd)/.local/sandboxes" \
+  -e VERGE_ADMIN_AUTH_TOKEN="$VERGE_ADMIN_AUTH_TOKEN" \
+  -e VERGE_TICKET_SECRET="$VERGE_TICKET_SECRET" \
+  -w "$(pwd)" \
   verge-browser-api:latest
 ```
+
+这种方式要求 API 容器看到的项目绝对路径与宿主机一致，这样它在创建运行时容器时才能正确挂载沙箱工作目录。
 
 API 会监听在 [http://127.0.0.1:8000](http://127.0.0.1:8000)，并内置管理页 [http://127.0.0.1:8000/admin](http://127.0.0.1:8000/admin)。
 
@@ -229,14 +238,17 @@ docker ps -aq --filter "label=verge.managed=true" | xargs -r docker rm -f && rm 
 
 ### 运行测试
 
+运行完整单元测试：
+
 ```bash
 PYTHONPATH=apps/api-server pytest
 ```
 
-包含基于 Docker 的集成测试：
+运行运行时相关改动的推荐本地校验流程：
 
 ```bash
-PYTHONPATH=apps/api-server pytest -m integration
+docker build -f docker/runtime-image.Dockerfile -t verge-browser-runtime:latest .
+PYTHONPATH=apps/api-server pytest tests/unit tests/integration/test_runtime_api.py
 ```
 
 ### 手动冒烟脚本
@@ -298,9 +310,9 @@ API 遵循 [`docs/tech.md`](./docs/tech.md) 中的 `/sandboxes/{sandbox_id}/...`
 
 SDK 和 CLI 的使用示例位于 [`docs/cli-sdk.md`](./docs/cli-sdk.md)。
 
-## 仍在进行中的工作
+## 当前加固重点
 
-在 [`docs/tech.md`](./docs/tech.md) 中描述的完整 V1 目标之前，以下领域仍需要更深入的实现工作：
+相对于 [`docs/tech.md`](./docs/tech.md) 中更完整的目标，当前主要的加固积压项包括：
 
 - 更强的 Docker 生命周期管理和基于健康检查的状态转换
 - 生产就绪的浏览器崩溃恢复和降级状态处理

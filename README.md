@@ -15,9 +15,9 @@ It provides a single-session isolated runtime with:
 
 ## Status
 
-This repository is in active build-out.
+The platform is functional today for local development and single-node deployment.
 
-The current codebase now includes a working runtime image and a live end-to-end control path for the main browser sandbox loop:
+The current codebase includes a working runtime image and a live end-to-end control path for the main browser sandbox loop:
 
 - runtime container boot with Chromium, Xvfb, Openbox, x11vnc, websockify, and a CDP relay
 - sandbox creation through the API
@@ -28,7 +28,7 @@ The current codebase now includes a working runtime image and a live end-to-end 
 - GUI action execution through `xdotool`
 - ticket-based VNC entry with noVNC asset proxying
 
-Some parts are still not production-hard yet, especially health-driven lifecycle transitions, browser crash recovery semantics, and broader integration / E2E coverage.
+Current hardening work is focused on health-driven lifecycle transitions, browser crash recovery semantics, and broader integration / E2E coverage.
 
 ## Why This Exists
 
@@ -144,9 +144,9 @@ pnpm --dir apps/admin-web dev
 
 The dev server listens on [http://127.0.0.1:5173](http://127.0.0.1:5173) and proxies `/sandboxes` and `/healthz` to the local API server on port `8000`.
 
-### Option 2: Docker Deployment (Recommended)
+### Option 2: Docker Deployment
 
-Run the API server and runtime entirely in Docker.
+Run the API server in Docker and let it manage runtime containers through the host Docker socket.
 
 ```bash
 # Build the runtime image (contains Chromium, VNC, etc.)
@@ -158,15 +158,24 @@ docker build -f docker/api-server.Dockerfile -t verge-browser-api:latest .
 # Create a directory for sandbox persistence
 mkdir -p .local/sandboxes
 
+# Set non-default auth secrets before exposing the service
+export VERGE_ADMIN_AUTH_TOKEN="replace-with-a-long-random-token"
+export VERGE_TICKET_SECRET="replace-with-a-long-random-ticket-secret"
+
 # Run the API server container
 docker run -d \
   --name verge-api \
   -p 8000:8000 \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  -v "$(pwd)/.local/sandboxes:/app/.local/sandboxes" \
-  -e VERGE_SANDBOX_BASE_DIR=/app/.local/sandboxes \
+  -v "$(pwd):$(pwd)" \
+  -e VERGE_SANDBOX_BASE_DIR="$(pwd)/.local/sandboxes" \
+  -e VERGE_ADMIN_AUTH_TOKEN="$VERGE_ADMIN_AUTH_TOKEN" \
+  -e VERGE_TICKET_SECRET="$VERGE_TICKET_SECRET" \
+  -w "$(pwd)" \
   verge-browser-api:latest
 ```
+
+This mode expects the API container to see the same absolute project path as the host so it can mount sandbox workspaces into runtime containers correctly.
 
 The API will be available at [http://127.0.0.1:8000](http://127.0.0.1:8000), and the bundled admin console at [http://127.0.0.1:8000/admin](http://127.0.0.1:8000/admin).
 
@@ -229,14 +238,17 @@ docker ps -aq --filter "label=verge.managed=true" | xargs -r docker rm -f && rm 
 
 ### Run Tests
 
+Run the full unit suite:
+
 ```bash
 PYTHONPATH=apps/api-server pytest
 ```
 
-To include Docker-backed integration coverage:
+Run the expected local validation flow for runtime-backed changes:
 
 ```bash
-PYTHONPATH=apps/api-server pytest -m integration
+docker build -f docker/runtime-image.Dockerfile -t verge-browser-runtime:latest .
+PYTHONPATH=apps/api-server pytest tests/unit tests/integration/test_runtime_api.py
 ```
 
 ### Manual Smoke Scripts
@@ -309,9 +321,9 @@ Verge Browser focuses purely on browser control:
 
 Arbitrary command execution is intentionally excluded to keep the surface area minimal and the focus sharp.
 
-## What Is Still In Progress
+## Current Hardening Areas
 
-The following areas still need deeper implementation work before the project reaches the full V1 target described in [`docs/tech.md`](./docs/tech.md):
+The following areas are the main hardening backlog relative to the broader target described in [`docs/tech.md`](./docs/tech.md):
 
 - stronger Docker lifecycle management and health-driven state transitions
 - production-ready browser crash recovery and degraded-state handling
