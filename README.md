@@ -69,19 +69,12 @@ Client / Agent / Human
 
 The repository currently implements:
 
-- FastAPI application bootstrap and configuration
-- sandbox create / get / delete flow with an in-memory registry and Docker-backed runtime startup
-- browser routes for info, viewport, screenshot, actions, restart, and CDP metadata
-- real window screenshots through X11 `import`
-- real page screenshots through CDP `Page.captureScreenshot`
-- CDP browser WebSocket proxy
-- VNC ticket issuance, noVNC asset proxying, and VNC WebSocket proxy
-- shell one-shot command execution
-- interactive shell session creation with WebSocket streaming
-- file list, read, write, upload, download, and delete APIs
-- `/workspace` path safety checks
-- ticket signing, verification, and one-time consumption
-- runtime Dockerfile, supervisor configuration, startup scripts, and smoke-tested Chromium runtime
+- sandbox create / get / delete flow with Docker-backed runtime startup
+- browser info, viewport, screenshot, actions, restart, and CDP proxying
+- ticket-based VNC entry with noVNC asset proxying
+- shell one-shot execution and interactive shell sessions
+- workspace-scoped file list, read, write, upload, download, and delete operations
+- runtime Dockerfile, supervisor configuration, startup scripts, and Docker-backed integration coverage
 
 ## Repository Layout
 
@@ -128,6 +121,45 @@ To include Docker-backed integration coverage:
 PYTHONPATH=apps/api-server pytest -m integration
 ```
 
+### 5. Manual smoke scripts
+
+Human-friendly smoke scripts live under [`tests/scripts`](./tests/scripts).
+
+Common flows:
+
+- `tests/scripts/create-sandbox.sh`
+  Creates a sandbox and prints the IDs and follow-up URLs you need.
+- `tests/scripts/get-vnc-url.sh`
+  Always creates a fresh sandbox and prints a browser-ready noVNC URL that you can open directly.
+- `tests/scripts/browser-smoke.sh`
+  Saves browser metadata plus window and page screenshots under `tests/scripts/.artifacts/`.
+- `tests/scripts/file-shell-smoke.sh`
+  Verifies that `/workspace` files are visible from both the file API and shell exec.
+- `tests/scripts/restart-browser.sh`
+  Restarts Chromium and saves browser info before and after.
+- `tests/scripts/full-manual-tour.sh`
+  Runs the most useful create + screenshot + shell/files + VNC flow end to end.
+- `tests/scripts/cleanup-sandbox.sh`
+  Deletes a sandbox when you pass `SANDBOX_ID=...`.
+
+Example:
+
+```bash
+tests/scripts/full-manual-tour.sh
+```
+
+If your API server is not on `http://127.0.0.1:8000`, set:
+
+```bash
+export BASE_URL="http://127.0.0.1:8000"
+```
+
+If you want to attach a bearer token, set:
+
+```bash
+export AUTH_TOKEN="<jwt>"
+```
+
 ## Runtime Image
 
 The runtime image hosts:
@@ -145,30 +177,9 @@ It also includes a small TCP relay so the platform can expose a stable CDP entry
 
 ## API Surface
 
-The current API structure follows the `/sandboxes/{sandbox_id}/...` convention from the design document.
+The API follows the `/sandboxes/{sandbox_id}/...` routing model from [`docs/tech.md`](./docs/tech.md).
 
-Representative endpoints:
-
-- `POST /sandboxes`
-- `GET /sandboxes/{id}`
-- `DELETE /sandboxes/{id}`
-- `GET /sandboxes/{id}/browser/info`
-- `GET /sandboxes/{id}/browser/screenshot`
-- `POST /sandboxes/{id}/browser/actions`
-- `POST /sandboxes/{id}/browser/restart`
-- `GET /sandboxes/{id}/browser/cdp/info`
-- `WS /sandboxes/{id}/browser/cdp/browser`
-- `POST /sandboxes/{id}/vnc/tickets`
-- `WS /sandboxes/{id}/vnc/websockify`
-- `POST /sandboxes/{id}/shell/exec`
-- `POST /sandboxes/{id}/shell/sessions`
-- `WS /sandboxes/{id}/shell/sessions/{session_id}/ws`
-- `GET /sandboxes/{id}/files/list`
-- `GET /sandboxes/{id}/files/read`
-- `POST /sandboxes/{id}/files/write`
-- `POST /sandboxes/{id}/files/upload`
-- `GET /sandboxes/{id}/files/download`
-- `DELETE /sandboxes/{id}/files`
+Detailed endpoint documentation lives in [`docs/api.md`](./docs/api.md).
 
 ## What Is Still In Progress
 

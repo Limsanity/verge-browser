@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Purpose: Shared helpers for manual Verge Browser API smoke scripts.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ARTIFACTS_DIR="$SCRIPT_DIR/.artifacts"
+
+mkdir -p "$ARTIFACTS_DIR"
+
+BASE_URL="${BASE_URL:-http://127.0.0.1:8000}"
+AUTH_TOKEN="${AUTH_TOKEN:-}"
+
+auth_args=()
+if [[ -n "$AUTH_TOKEN" ]]; then
+  auth_args=(-H "Authorization: Bearer $AUTH_TOKEN")
+fi
+
+json_get() {
+  local expr="$1"
+  python3 -c 'import json,sys; data=json.load(sys.stdin); print(eval(sys.argv[1], {"__builtins__": {}}, {"data": data}))' "$expr"
+}
+
+json_dump_pretty() {
+  python3 -m json.tool
+}
+
+api_json() {
+  local method="$1"
+  local url="$2"
+  shift 2
+  if [[ ${#auth_args[@]} -gt 0 ]]; then
+    curl -fsS -X "$method" "${auth_args[@]}" "$url" "$@"
+  else
+    curl -fsS -X "$method" "$url" "$@"
+  fi
+}
+
+api_file() {
+  local method="$1"
+  local url="$2"
+  shift 2
+  if [[ ${#auth_args[@]} -gt 0 ]]; then
+    curl -fsS -X "$method" "${auth_args[@]}" "$url" "$@"
+  else
+    curl -fsS -X "$method" "$url" "$@"
+  fi
+}
+
+require_sandbox_id() {
+  if [[ -z "${SANDBOX_ID:-}" ]]; then
+    echo "SANDBOX_ID is required. Pass it explicitly, for example:" >&2
+    echo "SANDBOX_ID=sb_xxx tests/scripts/browser-smoke.sh" >&2
+    exit 1
+  fi
+}
+
+timestamp() {
+  date +"%Y%m%d-%H%M%S"
+}
