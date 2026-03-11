@@ -69,7 +69,8 @@ async def create_vnc_ticket(
 async def vnc_entry(sandbox_id: str, ticket: str = Query(...), sandbox=Depends(require_sandbox)) -> HTMLResponse:
     verify_ticket(ticket, sandbox_id=sandbox_id, ticket_type="vnc", scope="connect", consume=True)
     session_id = _create_vnc_session(sandbox_id)
-    response = await _proxy_vnc_asset(sandbox, "vnc.html", query=f"path=sandboxes/{sandbox_id}/vnc/websockify")
+    query = f"path=sandboxes/{sandbox_id}/vnc/websockify&resize=scale&autoconnect=true"
+    response = await _proxy_vnc_asset(sandbox, "vnc.html", query=query)
     response.set_cookie("vnc_session", session_id, httponly=True, max_age=600, samesite="lax")
     return response
 

@@ -12,16 +12,6 @@ def _to_response(request: Request, sandbox) -> SandboxResponse:
     base_url = get_base_url(request)
     ws_base_url = base_url.replace("http://", "ws://").replace("https://", "wss://")
     viewport = ViewportInfo(width=sandbox.width, height=sandbox.height)
-    if sandbox.container_id:
-        try:
-            window = browser_service.get_viewport(sandbox)
-        except Exception:
-            window = None
-        if window is not None:
-            viewport = ViewportInfo(
-                width=window["window_viewport"]["width"],
-                height=window["window_viewport"]["height"],
-            )
     return SandboxResponse(
         id=sandbox.id,
         status=sandbox.status,

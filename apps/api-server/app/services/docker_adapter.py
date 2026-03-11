@@ -18,6 +18,7 @@ class DockerAdapter:
     def create_container(self, *, sandbox_id: str, workspace_dir: Path, width: int, height: int, default_url: str | None, image: str | None) -> tuple[str | None, str]:
         settings = get_settings()
         image_name = image or settings.sandbox_runtime_image
+        xvfb_whd = f"{width}x{height}x24"
         cmd = [
             "docker",
             "run",
@@ -27,6 +28,8 @@ class DockerAdapter:
             settings.sandbox_runtime_network,
             "-e",
             f"SANDBOX_ID={sandbox_id}",
+            "-e",
+            f"XVFB_WHD={xvfb_whd}",
             "-e",
             f"BROWSER_WINDOW_WIDTH={width}",
             "-e",
