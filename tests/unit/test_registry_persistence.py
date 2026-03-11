@@ -9,6 +9,7 @@ import pytest
 from app.config import get_settings
 from app.main import app
 from app.models.sandbox import RuntimeEndpoint, SandboxRecord, SandboxStatus
+from app.services.docker_adapter import ManagedContainer
 from app.services.registry import SandboxRegistry, registry
 
 
@@ -98,3 +99,43 @@ def test_app_startup_recovers_sandbox_from_disk(tmp_path: Path, monkeypatch: pyt
     assert response.status_code == 200
     assert response.json()["id"] == "sb_boot"
     assert response.json()["status"] == "STOPPED"
+
+
+def test_app_startup_removes_orphaned_runtime_containers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    base_dir = tmp_path / "sandboxes"
+    sandbox_dir = base_dir / "sb_keep"
+    sandbox_dir.mkdir(parents=True)
+    (sandbox_dir / "meta.json").write_text(
+        json.dumps(
+            {
+                "id": "sb_keep",
+                "created_at": "2026-03-11T00:00:00+00:00",
+                "updated_at": "2026-03-11T00:05:00+00:00",
+                "status": "RUNNING",
+                "width": 1280,
+                "height": 720,
+                "image": None,
+                "runtime": {"host": "10.0.0.8", "cdp_port": 9223, "vnc_port": 6080, "display": ":99", "browser_port": 5900},
+                "metadata": {},
+            }
+        )
+    )
+    removed: list[str] = []
+    monkeypatch.setenv("VERGE_SANDBOX_BASE_DIR", str(base_dir))
+    monkeypatch.setattr(
+        "app.main.docker_adapter.list_managed_container_refs",
+        lambda: [
+            ManagedContainer(container_id="cid-known-stopped", sandbox_id="sb_keep"),
+            ManagedContainer(container_id="cid-destroyed", sandbox_id="sb_gone"),
+            ManagedContainer(container_id="cid-unlabeled", sandbox_id=None),
+        ],
+    )
+    monkeypatch.setattr("app.main.docker_adapter.remove_container", removed.append)
+    get_settings.cache_clear()
+
+    with TestClient(app) as client:
+        response = client.get("/sandboxes/sb_keep")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "STOPPED"
+    assert removed == ["cid-destroyed", "cid-unlabeled"]

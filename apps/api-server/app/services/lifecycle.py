@@ -123,18 +123,53 @@ class SandboxLifecycleService:
 
     async def restart_browser(self, sandbox_id: str) -> bool:
         sandbox = registry.get(sandbox_id)
-        if sandbox is None or not sandbox.container_id:
+        if sandbox is None:
             return False
+
         sandbox.status = SandboxStatus.STARTING
         sandbox.updated_at = utcnow()
         sandbox.metadata.pop("runtime_error", None)
         registry.put(sandbox)
-        ok = docker_adapter.restart_browser(sandbox.container_id)
-        if not ok:
-            sandbox.status = SandboxStatus.DEGRADED
-            sandbox.updated_at = utcnow()
+
+        # Check if container still exists, recreate if needed
+        if sandbox.container_id and docker_adapter.container_exists(sandbox.container_id):
+            ok = docker_adapter.restart_browser(sandbox.container_id)
+            if not ok:
+                sandbox.status = SandboxStatus.DEGRADED
+                sandbox.updated_at = utcnow()
+                registry.put(sandbox)
+                return False
+        else:
+            # Container is gone, create a new one
+            if not docker_adapter.is_available():
+                sandbox.status = SandboxStatus.FAILED
+                sandbox.updated_at = utcnow()
+                sandbox.metadata["runtime_error"] = "docker daemon unavailable"
+                registry.put(sandbox)
+                return False
+
+            if sandbox.container_id:
+                docker_adapter.remove_container(sandbox.container_id)
+
+            container_id, host = docker_adapter.create_container(
+                sandbox_id=sandbox.id,
+                workspace_dir=sandbox.workspace_dir,
+                width=sandbox.width,
+                height=sandbox.height,
+                default_url=None,
+                image=sandbox.image,
+            )
+            if not container_id:
+                sandbox.status = SandboxStatus.FAILED
+                sandbox.updated_at = utcnow()
+                sandbox.metadata["runtime_error"] = "sandbox container failed to start"
+                registry.put(sandbox)
+                return False
+
+            sandbox.container_id = container_id
+            sandbox.runtime.host = host
             registry.put(sandbox)
-            return False
+
         settings = get_settings()
         await self._wait_until_ready(sandbox_id, timeout_sec=settings.sandbox_start_timeout_sec)
         refreshed = registry.get(sandbox_id)

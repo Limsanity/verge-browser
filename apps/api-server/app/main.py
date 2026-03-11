@@ -9,6 +9,7 @@ from app.routes.files import router as files_router
 from app.routes.health import router as health_router
 from app.routes.sandboxes import router as sandbox_router
 from app.routes.vnc import router as vnc_router
+from app.services.docker_adapter import docker_adapter
 from app.services.registry import registry
 
 
@@ -22,6 +23,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         uploads_subdir=settings.uploads_subdir,
         browser_profile_subdir=settings.browser_profile_subdir,
     )
+    known_sandbox_ids = {sandbox.id for sandbox in registry.all()}
+    for container in docker_adapter.list_managed_container_refs():
+        if container.sandbox_id not in known_sandbox_ids:
+            docker_adapter.remove_container(container.container_id)
     yield
 
 

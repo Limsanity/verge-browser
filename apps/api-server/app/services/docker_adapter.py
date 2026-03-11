@@ -2,9 +2,16 @@ from __future__ import annotations
 
 import json
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 
 from app.config import get_settings
+
+
+@dataclass(frozen=True)
+class ManagedContainer:
+    container_id: str
+    sandbox_id: str | None
 
 
 class DockerAdapter:
@@ -101,9 +108,48 @@ class DockerAdapter:
             return []
         return [line for line in proc.stdout.splitlines() if line]
 
+    def list_managed_container_refs(self) -> list[ManagedContainer]:
+        container_ids = self.list_managed_containers()
+        if not container_ids:
+            return []
+        try:
+            proc = subprocess.run(
+                [
+                    "docker",
+                    "inspect",
+                    "--format",
+                    f'{{{{.Id}}}}\t{{{{index .Config.Labels "{self.sandbox_label_key}"}}}}',
+                    *container_ids,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            return []
+        refs: list[ManagedContainer] = []
+        for line in proc.stdout.splitlines():
+            if not line:
+                continue
+            container_id, _, sandbox_id = line.partition("\t")
+            refs.append(ManagedContainer(container_id=container_id, sandbox_id=sandbox_id or None))
+        return refs
+
     def remove_managed_containers(self) -> None:
         for container_id in self.list_managed_containers():
             self.remove_container(container_id)
+
+    def container_exists(self, container_id: str) -> bool:
+        try:
+            proc = subprocess.run(
+                ["docker", "inspect", "--format", "{{.State.Running}}", container_id],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError:
+            return False
+        return proc.returncode == 0 and proc.stdout.strip() == "true"
 
     def restart_browser(self, container_id: str) -> bool:
         try:

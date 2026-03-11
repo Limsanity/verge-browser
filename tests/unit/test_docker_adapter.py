@@ -71,3 +71,37 @@ def test_remove_managed_containers_removes_all_labeled_containers(monkeypatch) -
     ]
     assert calls[1] == ["docker", "rm", "-f", "cid-1"]
     assert calls[2] == ["docker", "rm", "-f", "cid-2"]
+
+
+def test_list_managed_container_refs_reads_sandbox_labels(monkeypatch) -> None:
+    adapter = DockerAdapter()
+    calls: list[list[str]] = []
+
+    def fake_run(cmd: list[str], check: bool, capture_output: bool, text: bool) -> subprocess.CompletedProcess:
+        calls.append(cmd)
+        if cmd[:3] == ["docker", "ps", "-aq"]:
+            return subprocess.CompletedProcess(cmd, 0, stdout="cid-1\ncid-2\n", stderr="")
+        if cmd[:2] == ["docker", "inspect"]:
+            return subprocess.CompletedProcess(cmd, 0, stdout="cid-1\tsb_1\ncid-2\t\n", stderr="")
+        raise AssertionError(f"unexpected command: {cmd}")
+
+    monkeypatch.setattr("app.services.docker_adapter.subprocess.run", fake_run)
+
+    refs = adapter.list_managed_container_refs()
+
+    assert calls[0] == [
+        "docker",
+        "ps",
+        "-aq",
+        "--filter",
+        "label=verge.managed=true",
+    ]
+    assert calls[1] == [
+        "docker",
+        "inspect",
+        "--format",
+        '{{.Id}}\t{{index .Config.Labels "verge.sandbox.id"}}',
+        "cid-1",
+        "cid-2",
+    ]
+    assert [(ref.container_id, ref.sandbox_id) for ref in refs] == [("cid-1", "sb_1"), ("cid-2", None)]
