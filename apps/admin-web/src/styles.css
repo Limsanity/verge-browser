@@ -140,6 +140,26 @@ input {
   align-items: center;
 }
 
+.github-link {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  color: var(--text);
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  transition: all 0.2s ease;
+}
+
+.github-link:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
 .create-btn {
   text-wrap: nowrap;
 }

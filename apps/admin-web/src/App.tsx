@@ -1,6 +1,22 @@
 import { FormEvent, useState } from "react";
 import useSWR, { mutate } from "swr";
 
+// GitHub Icon Component
+function GitHubIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      width="20"
+      height="20"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
+    </svg>
+  );
+}
+
 type Sandbox = {
   id: string;
   alias: string | null;
@@ -62,7 +78,8 @@ async function api<T>(
 function useSandboxes(token: string) {
   const { data, error, isLoading, isValidating } = useSWR<Sandbox[]>(
     token ? [SWR_CONFIG_KEY, token] : null,
-    ([, t]: [string, string]) => api<Sandbox[]>("/sandboxes", t, { method: "GET" }),
+    ([, t]: [string, string]) =>
+      api<Sandbox[]>("/sandboxes", t, { method: "GET" }),
     {
       revalidateOnFocus: true,
       refreshInterval: 30000,
@@ -80,8 +97,11 @@ function useSandboxes(token: string) {
 
 function useSandboxDetail(token: string, idOrAlias: string | null) {
   const { data, error, isLoading } = useSWR<Sandbox>(
-    token && idOrAlias ? [`${SWR_CONFIG_KEY}/${idOrAlias}`, token, idOrAlias] : null,
-    ([, t, id]: [string, string, string]) => api<Sandbox>(`/sandboxes/${id}`, t, { method: "GET" }),
+    token && idOrAlias
+      ? [`${SWR_CONFIG_KEY}/${idOrAlias}`, token, idOrAlias]
+      : null,
+    ([, t, id]: [string, string, string]) =>
+      api<Sandbox>(`/sandboxes/${id}`, t, { method: "GET" }),
   );
 
   return {
@@ -106,7 +126,12 @@ export function App() {
   const [createAlias, setCreateAlias] = useState("");
   const [isActionLoading, setIsActionLoading] = useState(false);
 
-  const { sandboxes, isLoading: isListLoading, isValidating, refresh } = useSandboxes(token);
+  const {
+    sandboxes,
+    isLoading: isListLoading,
+    isValidating,
+    refresh,
+  } = useSandboxes(token);
   const { detail: selected } = useSandboxDetail(token, selectedId);
 
   const error = actionError;
@@ -188,7 +213,7 @@ export function App() {
     return (
       <main className="shell login-shell">
         <section className="login-card">
-          <p className="eyebrow">Verge Browser</p>
+          <p className="eyebrow">Welcome to Verge Browser</p>
           <h1>Admin Console</h1>
           <p className="muted">
             Use the shared admin token to manage every sandbox on this control
@@ -224,7 +249,9 @@ export function App() {
     <main className="shell">
       <section className="toolbar">
         <div>
-          <p className="eyebrow">Connected</p>
+          <p className="eyebrow">
+            <span>Verge Browser</span>
+          </p>
           <h1>Sandbox Control</h1>
         </div>
         <div className="toolbar-actions">
@@ -233,7 +260,11 @@ export function App() {
             onChange={(event) => setCreateAlias(event.target.value)}
             placeholder="alias (optional)"
           />
-          <button className="create-btn" onClick={() => void createSandbox()} disabled={isActionLoading}>
+          <button
+            className="create-btn"
+            onClick={() => void createSandbox()}
+            disabled={isActionLoading}
+          >
             {isActionLoading ? "Creating..." : "Create Sandbox"}
           </button>
           <button className="ghost" onClick={() => void refresh()}>
@@ -242,6 +273,15 @@ export function App() {
           <button className="ghost" onClick={logout}>
             Logout
           </button>
+          <a
+            href="https://github.com/zzzgydi/verge-browser"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="github-link"
+            title="View on GitHub"
+          >
+            <GitHubIcon />
+          </a>
         </div>
       </section>
 
@@ -251,7 +291,11 @@ export function App() {
         <article className="panel">
           <div className="panel-header">
             <h2>Sandboxes</h2>
-            <span>{isListLoading || isValidating ? "Syncing..." : `${sandboxes.length} total`}</span>
+            <span>
+              {isListLoading || isValidating
+                ? "Syncing..."
+                : `${sandboxes.length} total`}
+            </span>
           </div>
           <div className="list">
             {sandboxes.map((sandbox) => (
@@ -308,13 +352,22 @@ export function App() {
               </div>
 
               <div className="action-row">
-                <button onClick={() => void runAction("pause", selected)} disabled={isActionLoading}>
+                <button
+                  onClick={() => void runAction("pause", selected)}
+                  disabled={isActionLoading}
+                >
                   Pause
                 </button>
-                <button onClick={() => void runAction("resume", selected)} disabled={isActionLoading}>
+                <button
+                  onClick={() => void runAction("resume", selected)}
+                  disabled={isActionLoading}
+                >
                   Resume
                 </button>
-                <button onClick={() => void runAction("vnc", selected)} disabled={isActionLoading}>
+                <button
+                  onClick={() => void runAction("vnc", selected)}
+                  disabled={isActionLoading}
+                >
                   Open VNC
                 </button>
                 <button
