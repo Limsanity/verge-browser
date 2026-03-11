@@ -35,6 +35,8 @@ class SandboxRecord(BaseModel):
     status: SandboxStatus
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
+    width: int = 1280
+    height: int = 1024
     workspace_dir: Path
     downloads_dir: Path
     uploads_dir: Path

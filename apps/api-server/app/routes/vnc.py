@@ -35,7 +35,12 @@ def _validate_vnc_session(session_id: str | None, sandbox_id: str) -> None:
 
 
 @router.post("/tickets")
-async def create_vnc_ticket(sandbox_id: str, subject: str = Depends(get_current_subject)) -> dict[str, str]:
+async def create_vnc_ticket(
+    sandbox_id: str,
+    subject: str = Depends(get_current_subject),
+    sandbox=Depends(require_sandbox),
+) -> dict[str, str]:
+    del sandbox
     ticket = issue_ticket(sandbox_id=sandbox_id, subject=subject, ticket_type="vnc", scope="connect")
     return {"ticket": ticket}
 

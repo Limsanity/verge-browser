@@ -46,6 +46,8 @@ class SandboxLifecycleService:
             id=sandbox_id,
             status=status,
             updated_at=utcnow(),
+            width=req.width,
+            height=req.height,
             workspace_dir=workspace,
             downloads_dir=downloads,
             uploads_dir=uploads,

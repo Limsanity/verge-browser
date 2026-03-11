@@ -8,7 +8,7 @@ This repository implements a browser sandbox platform with:
 - a Docker-based runtime in `apps/sandbox-runtime`
 - a runtime image definition in `docker/runtime/Dockerfile`
 
-The source of truth for product and system design is `.docs/tech.md`.
+The source of truth for product and system design is `docs/tech.md`.
 
 ## Working Rules
 
@@ -39,7 +39,7 @@ If Docker is unavailable, unit tests are still expected to pass.
 
 ## Files Worth Reading First
 
-- `.docs/tech.md`
+- `docs/tech.md`
 - `apps/api-server/app/services/browser.py`
 - `apps/api-server/app/services/lifecycle.py`
 - `apps/api-server/app/routes/`

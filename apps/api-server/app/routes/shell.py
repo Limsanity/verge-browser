@@ -29,9 +29,9 @@ async def create_shell_session(
 
 @router.websocket("/sessions/{session_id}/ws")
 async def shell_session_ws(websocket: WebSocket, sandbox_id: str, session_id: str) -> None:
-    del sandbox_id
+    require_sandbox(sandbox_id)
     session = shell_service.get_session(session_id)
-    if session is None:
+    if session is None or session.sandbox_id != sandbox_id:
         await websocket.close(code=4404, reason="shell session not found")
         return
     await websocket.accept()
