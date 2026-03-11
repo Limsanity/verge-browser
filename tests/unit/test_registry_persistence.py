@@ -99,6 +99,7 @@ def test_app_startup_recovers_sandbox_from_disk(tmp_path: Path, monkeypatch: pyt
         )
     )
     monkeypatch.setenv("VERGE_SANDBOX_BASE_DIR", str(base_dir))
+    monkeypatch.setattr("app.main.docker_adapter.list_managed_container_refs", lambda: [])
     get_settings.cache_clear()
 
     with TestClient(app) as client:
@@ -109,7 +110,53 @@ def test_app_startup_recovers_sandbox_from_disk(tmp_path: Path, monkeypatch: pyt
     assert response.json()["status"] == "STOPPED"
 
 
-def test_app_startup_removes_orphaned_runtime_containers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_app_startup_reconciles_running_runtime_container(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    base_dir = tmp_path / "sandboxes"
+    sandbox_dir = base_dir / "sb_keep"
+    sandbox_dir.mkdir(parents=True)
+    (sandbox_dir / "meta.json").write_text(
+        json.dumps(
+            {
+                "id": "sb_keep",
+                "alias": "keep",
+                "created_at": "2026-03-11T00:00:00+00:00",
+                "updated_at": "2026-03-11T00:05:00+00:00",
+                "last_active_at": "2026-03-11T00:05:00+00:00",
+                "status": "RUNNING",
+                "width": 1280,
+                "height": 720,
+                "image": None,
+                "runtime": {"host": "10.0.0.8", "cdp_port": 9223, "vnc_port": 6080, "display": ":99", "browser_port": 5900},
+                "metadata": {"runtime_error": "stale"},
+            }
+        )
+    )
+    monkeypatch.setenv("VERGE_SANDBOX_BASE_DIR", str(base_dir))
+    monkeypatch.setattr(
+        "app.main.docker_adapter.list_managed_container_refs",
+        lambda: [ManagedContainer(container_id="cid-running", sandbox_id="sb_keep")],
+    )
+    monkeypatch.setattr("app.main.docker_adapter.container_exists", lambda container_id: container_id == "cid-running")
+    monkeypatch.setattr("app.main.docker_adapter.inspect_container_ip", lambda container_id: "172.18.0.10")
+
+    async def fake_browser_version(sandbox):
+        del sandbox
+        return {"Browser": "Chromium", "Protocol-Version": "1.3"}
+
+    monkeypatch.setattr("app.routes.sandboxes.browser_service.browser_version", fake_browser_version)
+    get_settings.cache_clear()
+
+    with TestClient(app) as client:
+        response = client.get("/sandboxes/sb_keep", headers=AUTH_HEADERS)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "RUNNING"
+    assert payload["container_id"] == "cid-running"
+    assert "runtime_error" not in payload["metadata"]
+
+
+def test_app_startup_removes_orphaned_and_stale_runtime_containers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     base_dir = tmp_path / "sandboxes"
     sandbox_dir = base_dir / "sb_keep"
     sandbox_dir.mkdir(parents=True)
@@ -140,6 +187,7 @@ def test_app_startup_removes_orphaned_runtime_containers(tmp_path: Path, monkeyp
             ManagedContainer(container_id="cid-unlabeled", sandbox_id=None),
         ],
     )
+    monkeypatch.setattr("app.main.docker_adapter.container_exists", lambda container_id: False)
     monkeypatch.setattr("app.main.docker_adapter.remove_container", removed.append)
     get_settings.cache_clear()
 
@@ -148,4 +196,4 @@ def test_app_startup_removes_orphaned_runtime_containers(tmp_path: Path, monkeyp
 
     assert response.status_code == 200
     assert response.json()["status"] == "STOPPED"
-    assert removed == ["cid-destroyed", "cid-unlabeled"]
+    assert removed == ["cid-known-stopped", "cid-destroyed", "cid-unlabeled"]

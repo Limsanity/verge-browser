@@ -14,6 +14,31 @@ from app.routes.sandboxes import router as sandbox_router
 from app.routes.vnc import router as vnc_router
 from app.services.docker_adapter import docker_adapter
 from app.services.registry import registry
+from app.models.sandbox import SandboxStatus
+
+
+def _reconcile_runtime_state() -> None:
+    known_sandbox_ids = {sandbox.id for sandbox in registry.all()}
+    for container in docker_adapter.list_managed_container_refs():
+        sandbox_id = container.sandbox_id
+        if sandbox_id not in known_sandbox_ids:
+            docker_adapter.remove_container(container.container_id)
+            continue
+
+        sandbox = registry.get(sandbox_id)
+        if sandbox is None:
+            docker_adapter.remove_container(container.container_id)
+            continue
+
+        if not docker_adapter.container_exists(container.container_id):
+            docker_adapter.remove_container(container.container_id)
+            continue
+
+        sandbox.container_id = container.container_id
+        sandbox.runtime.host = docker_adapter.inspect_container_ip(container.container_id) or "127.0.0.1"
+        sandbox.status = SandboxStatus.RUNNING
+        sandbox.metadata.pop("runtime_error", None)
+        registry.put(sandbox)
 
 
 @asynccontextmanager
@@ -26,10 +51,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         uploads_subdir=settings.uploads_subdir,
         browser_profile_subdir=settings.browser_profile_subdir,
     )
-    known_sandbox_ids = {sandbox.id for sandbox in registry.all()}
-    for container in docker_adapter.list_managed_container_refs():
-        if container.sandbox_id not in known_sandbox_ids:
-            docker_adapter.remove_container(container.container_id)
+    _reconcile_runtime_state()
     yield
 
 
