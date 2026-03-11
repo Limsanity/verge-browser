@@ -247,7 +247,9 @@ export function App() {
             onChange={(event) => setCreateAlias(event.target.value)}
             placeholder="alias (optional)"
           />
-          <button onClick={() => void createSandbox()}>Create Sandbox</button>
+          <button className="create-btn" onClick={() => void createSandbox()}>
+            Create Sandbox
+          </button>
           <button className="ghost" onClick={() => void refreshList()}>
             Refresh
           </button>
