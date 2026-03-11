@@ -108,7 +108,7 @@ uvicorn app.main:app --app-dir apps/api-server --host 0.0.0.0 --port 8000 --relo
 ### 3. Build the runtime image
 
 ```bash
-docker build -f docker/runtime/Dockerfile -t verge-browser-runtime:latest .
+docker build -f docker/Dockerfile -t verge-browser-runtime:latest .
 ```
 
 ### 4. Run tests

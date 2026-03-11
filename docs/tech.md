@@ -269,10 +269,7 @@ browser-sandbox/
       jwt.py
       tickets.py
   docker/
-    base/
-      Dockerfile
-    runtime/
-      Dockerfile
+    Dockerfile
   deployments/
     docker-compose.yml
     caddy/
