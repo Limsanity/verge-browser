@@ -47,6 +47,7 @@ class SandboxLifecycleService:
             updated_at=utcnow(),
             width=req.width,
             height=req.height,
+            image=req.image,
             workspace_dir=workspace,
             downloads_dir=downloads,
             uploads_dir=uploads,
@@ -61,7 +62,7 @@ class SandboxLifecycleService:
         return registry.get(sandbox_id) or sandbox
 
     def destroy(self, sandbox_id: str) -> bool:
-        sandbox = registry.delete(sandbox_id)
+        sandbox = registry.remove(sandbox_id)
         if sandbox is None:
             return False
         if sandbox.container_id:
@@ -70,6 +71,55 @@ class SandboxLifecycleService:
         if root.exists():
             shutil.rmtree(root, ignore_errors=True)
         return True
+
+    def pause(self, sandbox_id: str) -> bool:
+        sandbox = registry.get(sandbox_id)
+        if sandbox is None:
+            return False
+        if sandbox.container_id:
+            docker_adapter.remove_container(sandbox.container_id)
+        sandbox.container_id = None
+        sandbox.status = SandboxStatus.STOPPED
+        sandbox.updated_at = utcnow()
+        sandbox.runtime.host = "127.0.0.1"
+        sandbox.metadata.pop("runtime_error", None)
+        registry.put(sandbox)
+        return True
+
+    async def resume(self, sandbox_id: str) -> bool:
+        sandbox = registry.get(sandbox_id)
+        if sandbox is None or sandbox.status != SandboxStatus.STOPPED:
+            return False
+        if not docker_adapter.is_available():
+            sandbox.status = SandboxStatus.FAILED
+            sandbox.updated_at = utcnow()
+            sandbox.metadata["runtime_error"] = "docker daemon unavailable"
+            registry.put(sandbox)
+            return False
+        container_id, host = docker_adapter.create_container(
+            sandbox_id=sandbox.id,
+            workspace_dir=sandbox.workspace_dir,
+            width=sandbox.width,
+            height=sandbox.height,
+            default_url=None,
+            image=sandbox.image,
+        )
+        if not container_id:
+            sandbox.status = SandboxStatus.FAILED
+            sandbox.updated_at = utcnow()
+            sandbox.metadata["runtime_error"] = "sandbox container failed to start"
+            registry.put(sandbox)
+            return False
+        sandbox.container_id = container_id
+        sandbox.runtime.host = host
+        sandbox.status = SandboxStatus.STARTING
+        sandbox.updated_at = utcnow()
+        sandbox.metadata.pop("runtime_error", None)
+        registry.put(sandbox)
+        settings = get_settings()
+        await self._wait_until_ready(sandbox_id, timeout_sec=settings.sandbox_start_timeout_sec)
+        refreshed = registry.get(sandbox_id)
+        return refreshed is not None and refreshed.status == SandboxStatus.RUNNING
 
     async def restart_browser(self, sandbox_id: str) -> bool:
         sandbox = registry.get(sandbox_id)

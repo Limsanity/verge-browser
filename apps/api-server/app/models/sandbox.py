@@ -37,6 +37,7 @@ class SandboxRecord(BaseModel):
     updated_at: datetime = Field(default_factory=utcnow)
     width: int = 1280
     height: int = 1024
+    image: str | None = None
     workspace_dir: Path
     downloads_dir: Path
     uploads_dir: Path

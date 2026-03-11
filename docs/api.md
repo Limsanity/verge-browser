@@ -28,6 +28,12 @@ Example response:
 
 Create a sandbox and start the runtime if Docker is available.
 
+Persistence notes:
+
+- The sandbox workspace is created under the configured sandbox base directory.
+- Chromium uses `/workspace/browser-profile`, so cookies and local storage survive browser restarts and `pause` / `resume`.
+- The API server persists sandbox metadata to disk and reloads it on service startup. Reloaded sandboxes come back as `STOPPED` until resumed.
+
 Request body:
 
 ```json
@@ -57,6 +63,35 @@ Return current sandbox metadata and browser access info.
 ### `DELETE /sandboxes/{sandbox_id}`
 
 Destroy the sandbox and delete the workspace directory.
+
+### `POST /sandboxes/{sandbox_id}/pause`
+
+Stop and remove the runtime container while keeping the sandbox workspace on disk.
+
+Example response:
+
+```json
+{
+  "ok": true
+}
+```
+
+### `POST /sandboxes/{sandbox_id}/resume`
+
+Recreate the runtime container for a sandbox in `STOPPED` state and remount the existing workspace.
+
+Behavior notes:
+
+- Returns `409` if the sandbox is not currently `STOPPED`.
+- Returns `{ "ok": false }` if resume was attempted from `STOPPED` but the runtime could not be started.
+
+Example response:
+
+```json
+{
+  "ok": true
+}
+```
 
 ### `POST /sandboxes/{sandbox_id}/browser/restart`
 

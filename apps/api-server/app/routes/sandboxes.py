@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.deps import get_base_url, get_current_subject, require_sandbox
+from app.models.sandbox import SandboxStatus
 from app.schemas.sandbox import BrowserInfo, CreateSandboxRequest, RestartBrowserRequest, SandboxResponse, ViewportInfo
 from app.services.browser import browser_service
 from app.services.lifecycle import lifecycle_service
@@ -56,6 +57,23 @@ async def delete_sandbox(sandbox_id: str) -> Response:
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="sandbox not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{sandbox_id}/pause")
+async def pause_sandbox(sandbox_id: str) -> dict[str, bool]:
+    ok = lifecycle_service.pause(sandbox_id)
+    if not ok:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="sandbox not found")
+    return {"ok": True}
+
+
+@router.post("/{sandbox_id}/resume")
+async def resume_sandbox(sandbox_id: str) -> dict[str, bool]:
+    sandbox = require_sandbox(sandbox_id)
+    if sandbox.status != SandboxStatus.STOPPED:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="sandbox is not stopped")
+    ok = await lifecycle_service.resume(sandbox_id)
+    return {"ok": ok}
 
 
 @router.post("/{sandbox_id}/browser/restart")
