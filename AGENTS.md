@@ -6,7 +6,7 @@ This repository implements a browser sandbox platform with:
 
 - a FastAPI control plane in `apps/api-server`
 - a Docker-based runtime in `apps/sandbox-runtime`
-- a runtime image definition in `docker/Dockerfile`
+- a runtime image definition in `docker/runtime-image.Dockerfile`
 
 The source of truth for product and system design is `docs/tech.md`.
 
@@ -32,7 +32,7 @@ The source of truth for product and system design is `docs/tech.md`.
 Before considering runtime-related work complete, run:
 
 ```bash
-docker build -f docker/Dockerfile -t verge-browser-runtime:latest .
+docker build -f docker/runtime-image.Dockerfile -t verge-browser-runtime:latest .
 . .venv/bin/activate
 PYTHONPATH=apps/api-server pytest tests/unit tests/integration/test_runtime_api.py
 ```

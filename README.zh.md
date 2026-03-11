@@ -111,7 +111,7 @@ uvicorn app.main:app --app-dir apps/api-server --host 0.0.0.0 --port 8000 --relo
 ### 3. 构建运行时镜像
 
 ```bash
-docker build -f docker/Dockerfile -t verge-browser-runtime:latest .
+docker build -f docker/runtime-image.Dockerfile -t verge-browser-runtime:latest .
 ```
 
 ### 4. 使用 Docker Compose 运行完整栈

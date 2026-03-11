@@ -18,7 +18,7 @@ services:
   runtime-image:
     build:
       context: ..
-      dockerfile: docker/Dockerfile
+      dockerfile: docker/runtime-image.Dockerfile
     image: verge-browser-runtime:latest
     command: ["/bin/true"]
     profiles: ["build"]
