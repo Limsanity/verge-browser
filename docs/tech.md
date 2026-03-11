@@ -203,7 +203,14 @@ V1 职责约定：
 - 限流
 - Header 转发
 
-### 5.7 容器运行时
+### 5.7 Admin Web 交付方式
+
+- 管理页采用 `Vite + React`，源码位于 `apps/admin-web`。
+- 管理页构建产物直接输出到 `apps/api-server/app/static/admin`。
+- FastAPI 负责在 `/admin` 提供这些静态资源，并对前端路由回退到 `index.html`。
+- `docker/api-server.Dockerfile` 必须在镜像构建阶段完成 admin web 打包，避免运行时再依赖 Node 环境。
+
+### 5.8 容器运行时
 
 - Docker（开发 / 单机）
 - 后续可迁移至 Kubernetes
@@ -228,6 +235,12 @@ browser-sandbox/
         models/
         schemas/
         utils/
+        static/
+          admin/
+    admin-web/
+      src/
+      vite.config.ts
+      package.json
     sandbox-runtime/
       scripts/
         start_all.sh

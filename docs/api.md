@@ -8,6 +8,18 @@ Base convention:
 - WebSocket resources follow the same sandbox scoping model
 - All business APIs require `Authorization: Bearer <admin-token>`
 - `GET /healthz` remains anonymous
+- The admin web console is served by the API at `/admin`
+
+## Admin Web
+
+### `GET /admin`
+
+Returns the bundled admin SPA entrypoint.
+
+Notes:
+
+- Frontend build output lives under `apps/api-server/app/static/admin`.
+- `GET /admin/{path}` serves static assets directly and falls back to `index.html` for SPA routes.
 
 ## Health
 

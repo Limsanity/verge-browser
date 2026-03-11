@@ -77,6 +77,7 @@ Verge Browser 旨在通过一种运行时模型来弥合这一差距，该模型
 - 浏览器信息、视口、截图、操作、重启和 CDP 代理
 - 基于票据的 VNC 入口，支持 noVNC 资源代理
 - 工作空间范围的文件列表、读取、写入、上传、下载和删除操作
+- 管理页会被构建为静态资源，并由 API 在 `/admin` 路径下提供
 - 运行时 Dockerfile、supervisor 配置、启动脚本和基于 Docker 的集成测试
 
 ## 仓库结构
@@ -84,6 +85,7 @@ Verge Browser 旨在通过一种运行时模型来弥合这一差距，该模型
 ```text
 apps/
   api-server/         FastAPI 应用程序
+  admin-web/          Vite + React 管理页，构建后进入 API 静态资源目录
   sandbox-runtime/    运行时脚本和 supervisor 配置
 deployments/          本地部署资源
 docker/               运行时容器构建文件
@@ -97,6 +99,7 @@ tests/                单元测试
 **前置依赖：**
 
 - Python 3.11+
+- Node.js 22+，并启用 Corepack / pnpm
 - Docker（用于构建和运行运行时镜像）
 
 **1. 安装依赖**
@@ -107,19 +110,39 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-**2. 构建运行时镜像**
+**2. 安装并构建管理页**
+
+```bash
+corepack enable
+pnpm --dir apps/admin-web install --frozen-lockfile
+pnpm --dir apps/admin-web build
+```
+
+该命令会把静态产物输出到 `apps/api-server/app/static/admin`。
+
+**3. 构建运行时镜像**
 
 ```bash
 docker build -f docker/runtime-image.Dockerfile -t verge-browser-runtime:latest .
 ```
 
-**3. 启动 API 服务器**
+**4. 启动 API 服务器**
 
 ```bash
 uvicorn app.main:app --app-dir apps/api-server --host 0.0.0.0 --port 8000 --reload
 ```
 
-API 会监听在 [http://127.0.0.1:8000](http://127.0.0.1:8000)。
+API 会监听在 [http://127.0.0.1:8000](http://127.0.0.1:8000)，管理页位于 [http://127.0.0.1:8000/admin](http://127.0.0.1:8000/admin)。
+
+### 管理页开发模式
+
+如果只改管理页，可单独启动 Vite 开发服务器：
+
+```bash
+pnpm --dir apps/admin-web dev
+```
+
+默认访问地址为 [http://127.0.0.1:5173](http://127.0.0.1:5173)，并会把 `/sandboxes` 与 `/healthz` 代理到本地 `8000` 端口的 API。
 
 ### 方式二：Docker 部署（推荐）
 
@@ -129,7 +152,7 @@ API 会监听在 [http://127.0.0.1:8000](http://127.0.0.1:8000)。
 # 构建运行时镜像（包含 Chromium、VNC 等）
 docker build -f docker/runtime-image.Dockerfile -t verge-browser-runtime:latest .
 
-# 构建 API 服务器镜像
+# 构建 API 服务器镜像（同时构建并打包管理页）
 docker build -f docker/api-server.Dockerfile -t verge-browser-api:latest .
 
 # 创建沙箱持久化目录
@@ -145,7 +168,7 @@ docker run -d \
   verge-browser-api:latest
 ```
 
-API 会监听在 [http://127.0.0.1:8000](http://127.0.0.1:8000)。
+API 会监听在 [http://127.0.0.1:8000](http://127.0.0.1:8000)，并内置管理页 [http://127.0.0.1:8000/admin](http://127.0.0.1:8000/admin)。
 
 ### 方式三：Docker Compose
 
@@ -156,6 +179,8 @@ export PROJECT_ROOT="$PWD"
 docker compose -f deployments/docker-compose.yml build api runtime-image
 docker compose -f deployments/docker-compose.yml up api
 ```
+
+启动后可直接打开 [http://127.0.0.1:8000/admin](http://127.0.0.1:8000/admin)。
 
 ### 清理开发容器
 

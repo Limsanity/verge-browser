@@ -77,6 +77,7 @@ The repository currently implements:
 - browser info, viewport, screenshot, actions, restart, and CDP proxying
 - ticket-based VNC entry with noVNC asset proxying
 - workspace-scoped file list, read, write, upload, download, and delete operations
+- an admin web console that is built into static assets and served by the API at `/admin`
 - runtime Dockerfile, supervisor configuration, startup scripts, and Docker-backed integration coverage
 
 ## Repository Layout
@@ -84,6 +85,7 @@ The repository currently implements:
 ```text
 apps/
   api-server/         FastAPI application
+  admin-web/          Vite + React admin console, built into API static assets
   sandbox-runtime/    Runtime scripts and supervisor config
 deployments/          Local deployment assets
 docker/               Runtime container build files
@@ -97,6 +99,7 @@ tests/                Unit tests
 **Prerequisites:**
 
 - Python 3.11+
+- Node.js 22+ with Corepack / pnpm
 - Docker (for building and running the runtime image)
 
 **1. Install dependencies**
@@ -107,19 +110,39 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-**2. Build the runtime image**
+**2. Install and build the admin web**
+
+```bash
+corepack enable
+pnpm --dir apps/admin-web install --frozen-lockfile
+pnpm --dir apps/admin-web build
+```
+
+This emits static files into `apps/api-server/app/static/admin`.
+
+**3. Build the runtime image**
 
 ```bash
 docker build -f docker/runtime-image.Dockerfile -t verge-browser-runtime:latest .
 ```
 
-**3. Start the API server**
+**4. Start the API server**
 
 ```bash
 uvicorn app.main:app --app-dir apps/api-server --host 0.0.0.0 --port 8000 --reload
 ```
 
-The API will be available at [http://127.0.0.1:8000](http://127.0.0.1:8000).
+The API will be available at [http://127.0.0.1:8000](http://127.0.0.1:8000), and the admin console at [http://127.0.0.1:8000/admin](http://127.0.0.1:8000/admin).
+
+### Admin Web Development
+
+For admin UI development, run Vite separately:
+
+```bash
+pnpm --dir apps/admin-web dev
+```
+
+The dev server listens on [http://127.0.0.1:5173](http://127.0.0.1:5173) and proxies `/sandboxes` and `/healthz` to the local API server on port `8000`.
 
 ### Option 2: Docker Deployment (Recommended)
 
@@ -129,7 +152,7 @@ Run the API server and runtime entirely in Docker.
 # Build the runtime image (contains Chromium, VNC, etc.)
 docker build -f docker/runtime-image.Dockerfile -t verge-browser-runtime:latest .
 
-# Build the API server image
+# Build the API server image (also builds and bundles the admin web)
 docker build -f docker/api-server.Dockerfile -t verge-browser-api:latest .
 
 # Create a directory for sandbox persistence
@@ -145,7 +168,7 @@ docker run -d \
   verge-browser-api:latest
 ```
 
-The API will be available at [http://127.0.0.1:8000](http://127.0.0.1:8000).
+The API will be available at [http://127.0.0.1:8000](http://127.0.0.1:8000), and the bundled admin console at [http://127.0.0.1:8000/admin](http://127.0.0.1:8000/admin).
 
 ### Option 3: Docker Compose
 
@@ -156,6 +179,8 @@ export PROJECT_ROOT="$PWD"
 docker compose -f deployments/docker-compose.yml build api runtime-image
 docker compose -f deployments/docker-compose.yml up api
 ```
+
+After startup, open [http://127.0.0.1:8000/admin](http://127.0.0.1:8000/admin).
 
 ### Cleanup Development Containers
 
