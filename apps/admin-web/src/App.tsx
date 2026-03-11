@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import useSWR, { mutate } from "swr";
+import { toast } from "sonner";
 
 // GitHub Icon Component
 function GitHubIcon({ className }: { className?: string }) {
@@ -59,15 +60,17 @@ async function api<T>(
   });
 
   if (response.status === 401) {
-    throw new Error("Unauthorized. Check the admin token.");
+    const message = "Unauthorized. Check the admin token.";
+    toast.error(message);
+    throw new Error(message);
   }
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as {
       detail?: string;
     } | null;
-    throw new Error(
-      payload?.detail || `Request failed with ${response.status}`,
-    );
+    const message = payload?.detail || `Request failed with ${response.status}`;
+    toast.error(message);
+    throw new Error(message);
   }
   if (response.status === 204) {
     return undefined as T;
@@ -122,7 +125,6 @@ export function App() {
   const [inputApiUrl, setInputApiUrl] = useState(savedApiUrl);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState("");
   const [createAlias, setCreateAlias] = useState("");
   const [isActionLoading, setIsActionLoading] = useState(false);
 
@@ -134,8 +136,6 @@ export function App() {
   } = useSandboxes(token);
   const { detail: selected } = useSandboxDetail(token, selectedId);
 
-  const error = actionError;
-
   async function handleLogin(event: FormEvent) {
     event.preventDefault();
     localStorage.setItem(TOKEN_KEY, inputToken);
@@ -145,7 +145,6 @@ export function App() {
 
   async function createSandbox() {
     setIsActionLoading(true);
-    setActionError("");
     try {
       const detail = await api<Sandbox>("/sandboxes", token, {
         method: "POST",
@@ -158,8 +157,9 @@ export function App() {
       setCreateAlias("");
       await refresh();
       setSelectedId(detail.id);
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Request failed");
+      toast.success(`Sandbox ${detail.alias || detail.id.slice(0, 8)} created successfully`);
+    } catch {
+      // Error is already toasted by api()
     } finally {
       setIsActionLoading(false);
     }
@@ -170,11 +170,11 @@ export function App() {
     sandbox: Sandbox,
   ) {
     setIsActionLoading(true);
-    setActionError("");
     try {
       if (action === "delete") {
         await api(`/sandboxes/${sandbox.id}`, token, { method: "DELETE" });
         setSelectedId(null);
+        toast.success("Sandbox deleted successfully");
       } else if (action === "vnc") {
         const ticket = await api<{ ticket: string }>(
           `/sandboxes/${sandbox.id}/vnc/tickets`,
@@ -189,14 +189,16 @@ export function App() {
           "_blank",
           "noopener,noreferrer",
         );
+        toast.success("VNC session opened");
       } else {
         await api(`/sandboxes/${sandbox.id}/${action}`, token, {
           method: "POST",
         });
+        toast.success(`Sandbox ${action}d successfully`);
       }
       await refresh();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Request failed");
+    } catch {
+      // Error is already toasted by api()
     } finally {
       setIsActionLoading(false);
     }
@@ -239,7 +241,6 @@ export function App() {
             </label>
             <button type="submit">Open Console</button>
           </form>
-          {error ? <p className="error">{error}</p> : null}
         </section>
       </main>
     );
@@ -284,8 +285,6 @@ export function App() {
           </a>
         </div>
       </section>
-
-      {error ? <p className="error banner">{error}</p> : null}
 
       <section className="grid">
         <article className="panel">
