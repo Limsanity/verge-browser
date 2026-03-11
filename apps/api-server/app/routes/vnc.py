@@ -12,6 +12,7 @@ import websockets
 
 from app.auth.tickets import issue_ticket, verify_ticket
 from app.deps import get_current_subject, require_sandbox
+from app.models.sandbox import SandboxStatus
 
 router = APIRouter(prefix="/sandboxes/{sandbox_id}/vnc", tags=["vnc"])
 _vnc_sessions: dict[str, dict[str, object]] = {}
@@ -55,6 +56,15 @@ def _validate_vnc_session(session_id: str | None, sandbox_id: str) -> None:
         _prune_vnc_sessions()
 
 
+def _ensure_vnc_proxy_ready(sandbox) -> None:
+    runtime_error = sandbox.metadata.get("runtime_error")
+    if sandbox.status == SandboxStatus.FAILED:
+        detail = f"vnc unavailable: {runtime_error}" if runtime_error else "vnc unavailable: sandbox failed"
+        raise HTTPException(status_code=409, detail=detail)
+    if sandbox.status == SandboxStatus.STOPPED or sandbox.container_id is None:
+        raise HTTPException(status_code=409, detail="vnc unavailable: sandbox is not running")
+
+
 @router.post("/tickets")
 async def create_vnc_ticket(
     sandbox_id: str,
@@ -71,7 +81,7 @@ async def vnc_entry(sandbox_id: str, ticket: str = Query(...), sandbox=Depends(r
     verify_ticket(ticket, sandbox_id=sandbox_id, ticket_type="vnc", scope="connect", consume=True)
     session_id = _create_vnc_session(sandbox_id)
     del sandbox
-    query = f"path=sandboxes/{sandbox_id}/vnc/websockify&resize=scale&autoconnect=true"
+    query = f"path=/sandboxes/{sandbox_id}/vnc/websockify&resize=scale&autoconnect=true"
     response = RedirectResponse(url=f"/sandboxes/{sandbox_id}/vnc/vnc.html?{query}", status_code=302)
     response.set_cookie("vnc_session", session_id, httponly=True, max_age=600, samesite="lax")
     return response
@@ -85,6 +95,7 @@ async def vnc_asset_proxy(
     vnc_session: str | None = Cookie(default=None),
 ) -> Response:
     _validate_vnc_session(vnc_session, sandbox_id)
+    _ensure_vnc_proxy_ready(sandbox)
     return await _proxy_vnc_asset(sandbox, asset_path or "vnc.html")
 
 
@@ -108,6 +119,11 @@ async def vnc_websockify_proxy(websocket: WebSocket, sandbox_id: str) -> None:
         _validate_vnc_session(session_id, sandbox_id)
     except HTTPException:
         await websocket.close(code=4401, reason="invalid vnc session")
+        return
+    try:
+        _ensure_vnc_proxy_ready(sandbox)
+    except HTTPException as exc:
+        await websocket.close(code=1011, reason=str(exc.detail))
         return
     await websocket.accept()
     upstream_url = f"ws://{sandbox.runtime.host}:{sandbox.runtime.vnc_port}/websockify"

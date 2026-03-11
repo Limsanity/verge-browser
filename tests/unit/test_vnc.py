@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 from fastapi import HTTPException
 
 from app.routes import vnc
+from app.models.sandbox import RuntimeEndpoint, SandboxRecord, SandboxStatus
 
 
 def test_create_vnc_session_prunes_expired_entries() -> None:
@@ -43,6 +45,26 @@ async def test_vnc_entry_enables_autoconnect_and_scaling(monkeypatch: pytest.Mon
     response = await vnc.vnc_entry("sb_test", ticket="ticket", sandbox=object())
 
     assert response.status_code == 302
-    assert response.headers["location"] == "/sandboxes/sb_test/vnc/vnc.html?path=sandboxes/sb_test/vnc/websockify&resize=scale&autoconnect=true"
+    assert response.headers["location"] == "/sandboxes/sb_test/vnc/vnc.html?path=/sandboxes/sb_test/vnc/websockify&resize=scale&autoconnect=true"
     assert "vnc_session=" in response.headers["set-cookie"]
     vnc._vnc_sessions.clear()
+
+
+def test_ensure_vnc_proxy_ready_rejects_failed_sandbox_with_runtime_error() -> None:
+    sandbox = SandboxRecord(
+        id="sb_failed",
+        status=SandboxStatus.FAILED,
+        workspace_dir=Path("/tmp/sb_failed/workspace"),
+        downloads_dir=Path("/tmp/sb_failed/workspace/downloads"),
+        uploads_dir=Path("/tmp/sb_failed/workspace/uploads"),
+        browser_profile_dir=Path("/tmp/sb_failed/workspace/profile"),
+        container_id=None,
+        runtime=RuntimeEndpoint(host="127.0.0.1"),
+        metadata={"runtime_error": "docker daemon unavailable"},
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        vnc._ensure_vnc_proxy_ready(sandbox)
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail == "vnc unavailable: docker daemon unavailable"

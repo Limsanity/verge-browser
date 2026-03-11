@@ -164,11 +164,11 @@ During local development, you may accumulate many sandbox containers. Here are s
 **Quick cleanup - remove all verge sandbox containers:**
 
 ```bash
-# List all verge browser runtime containers
-docker ps -a --filter "ancestor=verge-browser-runtime:latest" --format "table {{.ID}}\t{{.Status}}\t{{.CreatedAt}}"
+# List all managed verge sandbox containers
+docker ps -a --filter "label=verge.managed=true" --format "table {{.ID}}\t{{.Image}}\t{{.Names}}\t{{.Status}}\t{{.Label \"verge.sandbox.id\"}}"
 
-# Stop and remove all verge browser runtime containers
-docker ps -q --filter "ancestor=verge-browser-runtime:latest" | xargs -r docker rm -f
+# Stop and remove all managed verge sandbox containers
+docker ps -aq --filter "label=verge.managed=true" | xargs -r docker rm -f
 
 # Also cleanup the API server container if running in Docker
 docker rm -f verge-api 2>/dev/null || true
@@ -177,8 +177,8 @@ docker rm -f verge-api 2>/dev/null || true
 **Full cleanup - remove containers and persisted data:**
 
 ```bash
-# Remove all runtime containers
-docker ps -q --filter "ancestor=verge-browser-runtime:latest" | xargs -r docker rm -f
+# Remove all managed runtime containers
+docker ps -aq --filter "label=verge.managed=true" | xargs -r docker rm -f
 
 # Remove persisted sandbox data (⚠️ Warning: this deletes all sandbox files)
 rm -rf .local/sandboxes
@@ -199,7 +199,7 @@ docker compose -f deployments/docker-compose.yml down -v
 > **WARNING: This will permanently delete ALL sandbox files in `.local/sandboxes/` including downloads, uploads, and browser profiles. Make sure you have backed up any important data before running this command.**
 
 ```bash
-docker ps -q --filter "ancestor=verge-browser-runtime:latest" | xargs -r docker rm -f && rm -rf .local/sandboxes
+docker ps -aq --filter "label=verge.managed=true" | xargs -r docker rm -f && rm -rf .local/sandboxes
 ```
 
 ### Run Tests

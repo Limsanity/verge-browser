@@ -164,11 +164,11 @@ docker compose -f deployments/docker-compose.yml up api
 **快速清理 - 移除所有 verge sandbox 容器：**
 
 ```bash
-# 列出所有 verge browser runtime 容器
-docker ps -a --filter "ancestor=verge-browser-runtime:latest" --format "table {{.ID}}\t{{.Status}}\t{{.CreatedAt}}"
+# 列出所有受管理的 verge sandbox 容器
+docker ps -a --filter "label=verge.managed=true" --format "table {{.ID}}\t{{.Image}}\t{{.Names}}\t{{.Status}}\t{{.Label \"verge.sandbox.id\"}}"
 
-# 停止并移除所有 verge browser runtime 容器
-docker ps -q --filter "ancestor=verge-browser-runtime:latest" | xargs -r docker rm -f
+# 停止并移除所有受管理的 verge sandbox 容器
+docker ps -aq --filter "label=verge.managed=true" | xargs -r docker rm -f
 
 # 如果使用 Docker 运行 API 服务器，也一并清理
 docker rm -f verge-api 2>/dev/null || true
@@ -177,8 +177,8 @@ docker rm -f verge-api 2>/dev/null || true
 **完整清理 - 移除容器和持久化数据：**
 
 ```bash
-# 移除所有运行时容器
-docker ps -q --filter "ancestor=verge-browser-runtime:latest" | xargs -r docker rm -f
+# 移除所有受管理的运行时容器
+docker ps -aq --filter "label=verge.managed=true" | xargs -r docker rm -f
 
 # 移除持久化的沙箱数据（⚠️ 警告：这会删除所有沙箱文件）
 rm -rf .local/sandboxes
@@ -199,7 +199,7 @@ docker compose -f deployments/docker-compose.yml down -v
 > **警告：此命令会永久删除 `.local/sandboxes/` 目录下的所有沙箱文件，包括下载文件、上传文件和浏览器配置文件。运行前请确保已备份重要数据。**
 
 ```bash
-docker ps -q --filter "ancestor=verge-browser-runtime:latest" | xargs -r docker rm -f && rm -rf .local/sandboxes
+docker ps -aq --filter "label=verge.managed=true" | xargs -r docker rm -f && rm -rf .local/sandboxes
 ```
 
 ### 运行测试

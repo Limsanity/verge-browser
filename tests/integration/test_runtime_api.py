@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.services.docker_adapter import docker_adapter
+from app.services.registry import registry
 
 
 pytestmark = pytest.mark.integration
@@ -46,6 +47,17 @@ def docker_runtime_ready() -> None:
     )
     if image_check.returncode != 0:
         pytest.skip("verge-browser-runtime:latest image not built")
+
+
+@pytest.fixture(autouse=True)
+def cleanup_managed_runtime_containers() -> None:
+    docker_adapter.remove_managed_containers()
+    for sandbox in tuple(registry.all()):
+        registry.delete(sandbox.id)
+    yield
+    docker_adapter.remove_managed_containers()
+    for sandbox in tuple(registry.all()):
+        registry.delete(sandbox.id)
 
 
 @pytest.fixture()
@@ -95,7 +107,7 @@ def test_runtime_browser_endpoints(docker_runtime_ready: None, clean_sandbox_bas
 
         vnc_entry = client.get(f"/sandboxes/{sandbox_id}/vnc/?ticket={ticket}", follow_redirects=False)
         assert vnc_entry.status_code == 302
-        assert vnc_entry.headers["location"] == f"/sandboxes/{sandbox_id}/vnc/vnc.html?path=sandboxes/{sandbox_id}/vnc/websockify&resize=scale&autoconnect=true"
+        assert vnc_entry.headers["location"] == f"/sandboxes/{sandbox_id}/vnc/vnc.html?path=/sandboxes/{sandbox_id}/vnc/websockify&resize=scale&autoconnect=true"
         assert "vnc_session" in vnc_entry.cookies
     finally:
         deleted = client.delete(f"/sandboxes/{sandbox_id}")
