@@ -353,8 +353,6 @@ Arbitrary command execution is intentionally excluded to keep the surface area m
 
 ## Current Hardening Areas
 
-The main hardening backlog relative to the broader target described in [`docs/tech.md`](./docs/tech.md):
-
 - stronger Docker lifecycle management and health-driven state transitions
 - production-ready browser crash recovery and degraded-state handling
 - file and browser integration coverage

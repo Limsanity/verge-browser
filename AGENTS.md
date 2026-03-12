@@ -8,8 +8,6 @@ This repository implements a browser sandbox platform with:
 - Docker-based runtimes in `apps/runtime-xvfb` and `apps/runtime-xpra`
 - runtime image definitions in `docker/runtime-xvfb.Dockerfile` and `docker/runtime-xpra.Dockerfile`
 
-The source of truth for product and system design is `docs/tech.md`.
-
 ## Working Rules
 
 - Prefer small, verifiable changes over speculative refactors.
@@ -43,7 +41,6 @@ If Docker is unavailable, unit tests are still expected to pass.
 
 ## Files Worth Reading First
 
-- `docs/tech.md`
 - `apps/api-server/app/services/browser.py`
 - `apps/api-server/app/services/lifecycle.py`
 - `apps/api-server/app/routes/`
