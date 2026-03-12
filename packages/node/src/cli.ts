@@ -407,7 +407,16 @@ export async function main(argv: string[]): Promise<number> {
   return runCli({ argv });
 }
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+const isMainModule = (): boolean => {
+  if (!process.argv[1]) return false;
+  const argvPath = new URL(`file://${process.argv[1]}`).href;
+  // Check if running directly or via npx/npm/yarn
+  return import.meta.url === argvPath ||
+    process.argv[1].includes('verge-browser') ||
+    import.meta.url.endsWith('/cli.js');
+};
+
+if (isMainModule()) {
   main(process.argv.slice(2)).then((code) => {
     process.exitCode = code;
   });

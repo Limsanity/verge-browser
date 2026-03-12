@@ -23,12 +23,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--json", action="store_true", dest="json_output")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
-    sandbox = subparsers.add_parser("sandbox")
+
+    # Shared parent parser for common options on subcommands
+    parent_parser = argparse.ArgumentParser(add_help=False)
+    parent_parser.add_argument("--json", action="store_true", dest="json_output")
+    sandbox = subparsers.add_parser("sandbox", parents=[parent_parser])
     sandbox_subparsers = sandbox.add_subparsers(dest="sandbox_command", required=True)
 
-    sandbox_subparsers.add_parser("list")
+    sandbox_subparsers.add_parser("list", parents=[parent_parser])
 
-    create = sandbox_subparsers.add_parser("create")
+    create = sandbox_subparsers.add_parser("create", parents=[parent_parser])
     create.add_argument("--alias", default=None)
     create.add_argument("--kind", default="xvfb_vnc", choices=["xvfb_vnc", "xpra"])
     create.add_argument("--width", type=int, default=1280)
@@ -36,60 +40,60 @@ def build_parser() -> argparse.ArgumentParser:
     create.add_argument("--default-url", default=None)
     create.add_argument("--image", default=None)
 
-    get_cmd = sandbox_subparsers.add_parser("get")
+    get_cmd = sandbox_subparsers.add_parser("get", parents=[parent_parser])
     get_cmd.add_argument("id_or_alias")
 
-    update = sandbox_subparsers.add_parser("update")
+    update = sandbox_subparsers.add_parser("update", parents=[parent_parser])
     update.add_argument("id_or_alias")
     update.add_argument("--alias", required=True)
 
     for name in ("pause", "resume", "rm", "restart", "cdp", "session"):
-        cmd = sandbox_subparsers.add_parser(name)
+        cmd = sandbox_subparsers.add_parser(name, parents=[parent_parser])
         cmd.add_argument("id_or_alias")
 
     # Browser subcommand
-    browser = subparsers.add_parser("browser")
+    browser = subparsers.add_parser("browser", parents=[parent_parser])
     browser_subparsers = browser.add_subparsers(dest="browser_command", required=True)
 
-    screenshot = browser_subparsers.add_parser("screenshot")
+    screenshot = browser_subparsers.add_parser("screenshot", parents=[parent_parser])
     screenshot.add_argument("id_or_alias")
     screenshot.add_argument("--type", default="page", choices=["window", "page"])
     screenshot.add_argument("--format", default="jpeg", choices=["png", "jpeg", "webp"])
     screenshot.add_argument("--target-id", default=None)
     screenshot.add_argument("--output", default=None, help="Write screenshot to file")
 
-    actions = browser_subparsers.add_parser("actions")
+    actions = browser_subparsers.add_parser("actions", parents=[parent_parser])
     actions.add_argument("id_or_alias")
     actions.add_argument("--input", required=True, help="JSON file with actions payload")
 
     # Files subcommand
-    files = subparsers.add_parser("files")
+    files = subparsers.add_parser("files", parents=[parent_parser])
     files_subparsers = files.add_subparsers(dest="files_command", required=True)
 
-    list_cmd = files_subparsers.add_parser("list")
+    list_cmd = files_subparsers.add_parser("list", parents=[parent_parser])
     list_cmd.add_argument("id_or_alias")
     list_cmd.add_argument("path", nargs="?", default="/workspace")
 
-    read = files_subparsers.add_parser("read")
+    read = files_subparsers.add_parser("read", parents=[parent_parser])
     read.add_argument("id_or_alias")
     read.add_argument("path")
 
-    write = files_subparsers.add_parser("write")
+    write = files_subparsers.add_parser("write", parents=[parent_parser])
     write.add_argument("id_or_alias")
     write.add_argument("path")
     write.add_argument("--content", required=True)
     write.add_argument("--overwrite", action="store_true")
 
-    upload = files_subparsers.add_parser("upload")
+    upload = files_subparsers.add_parser("upload", parents=[parent_parser])
     upload.add_argument("id_or_alias")
     upload.add_argument("local_path")
 
-    download = files_subparsers.add_parser("download")
+    download = files_subparsers.add_parser("download", parents=[parent_parser])
     download.add_argument("id_or_alias")
     download.add_argument("path")
     download.add_argument("--output", default=None)
 
-    rm = files_subparsers.add_parser("rm")
+    rm = files_subparsers.add_parser("rm", parents=[parent_parser])
     rm.add_argument("id_or_alias")
     rm.add_argument("path")
 
