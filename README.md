@@ -377,4 +377,8 @@ The main hardening backlog relative to the broader target described in [`docs/te
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](./LICENSE).
+The original source code in this repository is licensed under the MIT License. See [LICENSE](./LICENSE).
+
+Built runtime artifacts may include third-party software under separate licenses. In particular, the `runtime-xpra` image installs Xpra, which is licensed under GPL v2 or later and remains subject to its own license terms.
+
+See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) and [docs/open-source-compliance.md](./docs/open-source-compliance.md) before distributing container images externally.

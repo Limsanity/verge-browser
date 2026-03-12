@@ -377,4 +377,8 @@ Verge Browser 聚焦于浏览器控制：
 
 ## 许可证
 
-本项目采用 MIT 许可证。参见 [LICENSE](./LICENSE)。
+本仓库中的原创源码采用 MIT 许可证。参见 [LICENSE](./LICENSE)。
+
+但构建后的运行时产物可能包含按其他许可证发布的第三方组件。其中 `runtime-xpra` 镜像会安装 Xpra；Xpra 采用 GPL v2 或更高版本许可证，并继续受其自身许可证约束。
+
+对外分发容器镜像前，请同时查看 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) 与 [docs/open-source-compliance.md](./docs/open-source-compliance.md)。
