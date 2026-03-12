@@ -2,33 +2,48 @@
 
 English | [中文](./README.zh.md)
 
-Verge Browser is a browser sandbox platform for agents.
+A browser sandbox platform for AI agents, combining CDP automation, GUI-level screenshots, shared files, and visual human handoff in one isolated runtime.
 
-It provides a single-session isolated runtime with:
+## Core Capabilities
 
-- a real GUI Chromium instance
-- Chrome DevTools Protocol (CDP) access
-- VNC / noVNC human takeover
-- GUI-level screenshots and input automation
-- a shared `/workspace` file system
-- a unified REST and WebSocket control plane
+- **Real GUI Chromium**: not headless; supports multi-tabs, downloads, popups, and full browser behavior
+- **CDP Automation**: compatible with Playwright and Puppeteer through a WebSocket endpoint
+- **GUI-Level Screenshots**: capture the full browser window, not only page content
+- **Human Handoff**: unified session entry for both noVNC and Xpra
+- **File Sharing**: browser and APIs share `/workspace` for uploads, downloads, and artifacts
+
+## Desktop Options Comparison
+
+| Feature | `xvfb_vnc` | `xpra` |
+| --- | --- | --- |
+| Stack | Xvfb + x11vnc + noVNC | Xpra Server + HTML5 Client |
+| Latency | Medium | Low |
+| Clipboard | One-way (manual sync) | Bidirectional auto-sync |
+| Network Adaptation | Good | Excellent |
+| Use Case | Automation-first, occasional human check | Frequent human collaboration and debugging |
+| Usage | Set `kind: "xvfb_vnc"` on create | Set `kind: "xpra"` on create |
+
+How to choose:
+
+- Mostly automation, with occasional human inspection: use `xvfb_vnc`
+- Frequent manual intervention or remote debugging: use `xpra`
 
 ## Status
 
 The platform is functional today for local development and single-node deployment.
 
-The current codebase includes a working runtime image and a live end-to-end control path for the main browser sandbox loop:
+The current codebase already includes:
 
-- runtime container boot with Chromium, Xvfb, Openbox, x11vnc, websockify, and a CDP relay
+- runtime container boot with Chromium, Xvfb/Openbox or Xpra, and a CDP relay
 - sandbox creation through the API
 - persisted sandbox metadata with startup recovery into `STOPPED`
-- pause / resume lifecycle for reusing an existing workspace
+- pause and resume lifecycle for reusing an existing workspace
 - real window screenshots
-- real page screenshots through CDP
+- page screenshots through CDP
 - GUI action execution through `xdotool`
-- ticket-based VNC entry with noVNC asset proxying
+- ticket-based session entry for noVNC and Xpra
 
-Current hardening work is focused on health-driven lifecycle transitions, browser crash recovery semantics, and broader integration / E2E coverage.
+Current hardening work is focused on health-driven lifecycle transitions, browser crash recovery semantics, and broader integration and E2E coverage.
 
 ## Why This Exists
 
@@ -39,17 +54,16 @@ Most browser automation systems focus on headless page control. That is not enou
 - human takeover when automation stalls
 - shared files inside the same environment
 
-Verge Browser is designed to close that gap with a runtime model that keeps browser, GUI, and files in one isolated sandbox.
+Verge Browser keeps browser, GUI, and files in one isolated sandbox so those workflows remain continuous instead of split across multiple tools.
 
 ## Architecture
 
-At a high level, the platform is split into two parts:
+At a high level, the platform has two parts:
 
 1. API server
-   Exposes REST and WebSocket endpoints for sandbox lifecycle, browser control, files, CDP proxying, and ticket-based VNC access.
-
+   Exposes REST and WebSocket endpoints for sandbox lifecycle, browser control, files, CDP proxying, and ticket-based session access.
 2. Sandbox runtime
-   Runs Chromium, Xvfb, Openbox, x11vnc, websockify, and supervisor inside a single isolated container with a shared `/workspace`.
+   Runs Chromium, the desktop stack, and shared `/workspace` inside one isolated container.
 
 ```text
 Client / Agent / Human
@@ -76,8 +90,8 @@ The repository currently implements:
 - browser info, viewport, screenshot, actions, restart, and CDP proxying
 - ticket-based session entry with noVNC or Xpra asset proxying
 - workspace-scoped file list, read, write, upload, download, and delete operations
-- an admin web console that is built into static assets and served by the API at `/admin`
-- runtime Dockerfile, supervisor configuration, startup scripts, and Docker-backed integration coverage
+- an admin web console built into static assets and served by the API at `/admin`
+- runtime Dockerfiles, supervisor configuration, startup scripts, and Docker-backed integration coverage
 
 ## Repository Layout
 
@@ -89,20 +103,33 @@ apps/
   runtime-xpra/       Xpra runtime assets
 deployments/          Local deployment assets
 docker/               Runtime and API container build files
-tests/                Unit tests
+tests/                Unit and integration tests
+docs/                 Product, API, and technical docs
 ```
 
 ## Quick Start
 
-### Option 1: Local Development
+### Option 1: Docker Compose (Recommended)
 
-**Prerequisites:**
+```bash
+export PROJECT_ROOT="$PWD"
+docker compose -f deployments/docker-compose.yml build api runtime-xvfb runtime-xpra
+docker compose -f deployments/docker-compose.yml up api
+```
+
+Open [http://127.0.0.1:8000/admin](http://127.0.0.1:8000/admin) to start using.
+
+For local development, sign in with the default admin token `dev-admin-token` unless you override `VERGE_ADMIN_AUTH_TOKEN`.
+
+### Option 2: Local Development
+
+Prerequisites:
 
 - Python 3.11+
 - Node.js 22+ with Corepack / pnpm
-- Docker (for building and running the runtime image)
+- Docker
 
-**1. Install dependencies**
+1. Install dependencies
 
 ```bash
 python3 -m venv .venv
@@ -110,7 +137,7 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-**2. Install and build the admin web**
+2. Install and build the admin web
 
 ```bash
 corepack enable
@@ -120,41 +147,31 @@ pnpm --dir apps/admin-web build
 
 This emits static files into `apps/api-server/app/static/admin`.
 
-**3. Build the runtime images**
+3. Build the runtime images
 
 ```bash
 docker build -f docker/runtime-xvfb.Dockerfile -t verge-browser-runtime-xvfb:latest .
 docker build -f docker/runtime-xpra.Dockerfile -t verge-browser-runtime-xpra:latest .
 ```
 
-**4. Start the API server**
+4. Start the API server
 
 ```bash
 uvicorn app.main:app --app-dir apps/api-server --host 0.0.0.0 --port 8000 --reload
 ```
 
-The API will be available at [http://127.0.0.1:8000](http://127.0.0.1:8000), and the admin console at [http://127.0.0.1:8000/admin](http://127.0.0.1:8000/admin).
+The API is available at [http://127.0.0.1:8000](http://127.0.0.1:8000), and the admin console is at [http://127.0.0.1:8000/admin](http://127.0.0.1:8000/admin).
 
-### Admin Web Development
-
-For admin UI development, run Vite separately:
-
-```bash
-pnpm --dir apps/admin-web dev
-```
-
-The dev server listens on [http://127.0.0.1:5173](http://127.0.0.1:5173) and proxies `/sandboxes` and `/healthz` to the local API server on port `8000`.
-
-### Option 2: Docker Deployment
+### Option 3: Docker Deployment
 
 Run the API server in Docker and let it manage runtime containers through the host Docker socket.
 
 ```bash
-# Build both runtime images
+# Build runtime images
 docker build -f docker/runtime-xvfb.Dockerfile -t verge-browser-runtime-xvfb:latest .
 docker build -f docker/runtime-xpra.Dockerfile -t verge-browser-runtime-xpra:latest .
 
-# Build the API server image (also builds and bundles the admin web)
+# Build API server image (also bundles the admin web)
 docker build -f docker/api-server.Dockerfile -t verge-browser-api:latest .
 
 # Create a directory for sandbox persistence
@@ -179,64 +196,76 @@ docker run -d \
 
 This mode expects the API container to see the same absolute project path as the host so it can mount sandbox workspaces into runtime containers correctly.
 
-The API will be available at [http://127.0.0.1:8000](http://127.0.0.1:8000), and the bundled admin console at [http://127.0.0.1:8000/admin](http://127.0.0.1:8000/admin).
+### Basic Usage Examples
 
-### Option 3: Docker Compose
-
-For convenience, use the provided compose file:
+Create a sandbox:
 
 ```bash
-export PROJECT_ROOT="$PWD"
-docker compose -f deployments/docker-compose.yml build api runtime-xvfb runtime-xpra
-docker compose -f deployments/docker-compose.yml up api
+curl -X POST http://localhost:8000/sandbox \
+  -H "Authorization: Bearer $AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "alias": "test",
+    "kind": "xvfb_vnc",
+    "default_url": "https://example.com",
+    "width": 1440,
+    "height": 900
+  }'
 ```
 
-After startup, open [http://127.0.0.1:8000/admin](http://127.0.0.1:8000/admin).
-
-### Cleanup Development Containers
-
-During local development, you may accumulate many sandbox containers. Here are several ways to clean them up:
-
-**Quick cleanup - remove all verge sandbox containers:**
+Get browser info:
 
 ```bash
-# List all managed verge sandbox containers
-docker ps -a --filter "label=verge.managed=true" --format "table {{.ID}}\t{{.Image}}\t{{.Names}}\t{{.Status}}\t{{.Label \"verge.sandbox.id\"}}"
-
-# Stop and remove all managed verge sandbox containers
-docker ps -aq --filter "label=verge.managed=true" | xargs -r docker rm -f
-
-# Also cleanup the API server container if running in Docker
-docker rm -f verge-api 2>/dev/null || true
+curl http://localhost:8000/sandbox/{sandbox_id} \
+  -H "Authorization: Bearer $AUTH_TOKEN"
 ```
 
-**Full cleanup - remove containers and persisted data:**
+Take a screenshot:
 
 ```bash
-# Remove all managed runtime containers
-docker ps -aq --filter "label=verge.managed=true" | xargs -r docker rm -f
-
-# Remove persisted sandbox data (⚠️ Warning: this deletes all sandbox files)
-rm -rf .local/sandboxes
+curl -X POST http://localhost:8000/sandbox/{sandbox_id}/browser/screenshot \
+  -H "Authorization: Bearer $AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"type": "window"}'
 ```
 
-**Using Docker Compose:**
+Execute GUI actions:
 
 ```bash
-# Stop and remove all containers
-docker compose -f deployments/docker-compose.yml down
-
-# To also remove volumes and persisted data
-docker compose -f deployments/docker-compose.yml down -v
+curl -X POST http://localhost:8000/sandbox/{sandbox_id}/browser/actions \
+  -H "Authorization: Bearer $AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "actions": [
+      {"type": "MOVE_TO", "x": 720, "y": 450},
+      {"type": "CLICK"},
+      {"type": "WAIT", "duration_ms": 1000}
+    ]
+  }'
 ```
 
-**⚠️ One-liner for full development reset (DANGEROUS):**
-
-> **WARNING: This will permanently delete ALL sandbox files in `.local/sandboxes/` including downloads, uploads, and browser profiles. Make sure you have backed up any important data before running this command.**
+Get a human handoff URL:
 
 ```bash
-docker ps -aq --filter "label=verge.managed=true" | xargs -r docker rm -f && rm -rf .local/sandboxes
+curl -X POST http://localhost:8000/sandbox/{sandbox_id}/session/apply \
+  -H "Authorization: Bearer $AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "one_time", "ttl_sec": 300}'
 ```
+
+For more APIs, see [`docs/api.md`](./docs/api.md).
+
+## Development Guide
+
+### Admin Web Development
+
+For admin UI development, run Vite separately:
+
+```bash
+pnpm --dir apps/admin-web dev
+```
+
+The dev server listens on [http://127.0.0.1:5173](http://127.0.0.1:5173).
 
 ### Run Tests
 
@@ -260,18 +289,13 @@ Human-friendly smoke scripts live under [`tests/scripts`](./tests/scripts).
 
 Common flows:
 
-- `tests/scripts/create-sandbox.sh`
-  Creates a sandbox and prints the IDs and follow-up URLs you need.
-- `tests/scripts/get-session-url.sh`
-  Always creates a fresh sandbox and prints a browser-ready session URL that you can open directly.
-- `tests/scripts/browser-smoke.sh`
-  Saves browser metadata plus window and page screenshots under `tests/scripts/.artifacts/`.
-- `tests/scripts/restart-browser.sh`
-  Restarts Chromium and saves browser info before and after.
-- `tests/scripts/full-manual-tour.sh`
-  Runs the most useful create + screenshot + files + VNC flow end to end.
-- `tests/scripts/cleanup-sandbox.sh`
-  Deletes a sandbox when you pass `SANDBOX_ID=...`.
+- `tests/scripts/create-sandbox.sh`: create a sandbox and print the IDs and follow-up URLs you need
+- `tests/scripts/get-session-url.sh`: create or reuse a sandbox and print a browser-ready session URL
+- `tests/scripts/browser-smoke.sh`: save browser metadata plus window and page screenshots under `tests/scripts/.artifacts/`
+- `tests/scripts/files-smoke.sh`: exercise the file APIs against `/workspace`
+- `tests/scripts/restart-browser.sh`: restart Chromium and save browser info before and after
+- `tests/scripts/full-manual-tour.sh`: run the most useful create + screenshot + files + session flow end to end
+- `tests/scripts/cleanup-sandbox.sh`: delete a sandbox when you pass `SANDBOX_ID=...`
 
 Example:
 
@@ -285,10 +309,33 @@ If your API server is not on `http://127.0.0.1:8000`, set:
 export BASE_URL="http://127.0.0.1:8000"
 ```
 
-Business APIs now require the admin bearer token. Set:
+Business APIs require the admin bearer token. Set:
 
 ```bash
 export AUTH_TOKEN="<admin-token>"
+```
+
+### Cleanup Development Containers
+
+Quick cleanup:
+
+```bash
+docker ps -aq --filter "label=verge.managed=true" | xargs -r docker rm -f
+docker rm -f verge-api 2>/dev/null || true
+```
+
+Full cleanup, including persisted data:
+
+```bash
+docker ps -aq --filter "label=verge.managed=true" | xargs -r docker rm -f
+rm -rf .local/sandboxes
+```
+
+Using Docker Compose:
+
+```bash
+docker compose -f deployments/docker-compose.yml down
+docker compose -f deployments/docker-compose.yml down -v
 ```
 
 ## Runtime Image
@@ -298,19 +345,16 @@ The runtime images host:
 - Chromium
 - xdotool
 - supervisor
-
-It also includes a small TCP relay so the platform can expose a stable CDP entrypoint even though Chromium itself listens on the internal debugging port.
+- a small TCP relay so the platform can expose a stable CDP entrypoint even though Chromium itself listens on an internal debugging port
 
 Two runtime variants are supported:
 
-- `xvfb_vnc`
-  Xvfb + x11vnc + noVNC / websockify
-- `xpra`
-  Xpra server + HTML5 client assets
+- `xvfb_vnc`: Xvfb + Openbox + x11vnc + noVNC / websockify
+- `xpra`: Xpra server + HTML5 client assets
 
 ## API Surface
 
-The API follows the `/sandboxes/{sandbox_id}/...` routing model from [`docs/tech.md`](./docs/tech.md).
+The current API follows the `/sandbox/{sandbox_id}/...` routing model.
 
 Detailed endpoint documentation lives in [`docs/api.md`](./docs/api.md).
 
@@ -318,40 +362,39 @@ SDK and CLI usage examples live in [`docs/cli-sdk.md`](./docs/cli-sdk.md).
 
 ## Scope
 
-Verge Browser focuses purely on browser control:
-- Browser lifecycle (create, pause, resume, delete)
-- Browser automation via CDP
-- GUI screenshots and input actions
-- Session-based human takeover (`xvfb_vnc` or `xpra`)
-- File system for sharing data with the browser
+Verge Browser focuses on browser control:
 
-Arbitrary command execution is intentionally excluded to keep the surface area minimal and the focus sharp.
+- browser lifecycle: create, pause, resume, delete
+- browser automation via CDP
+- GUI screenshots and input actions
+- session-based human takeover with `xvfb_vnc` or `xpra`
+- file exchange through the sandbox workspace
+
+Arbitrary command execution is intentionally excluded to keep the surface area minimal and the focus narrow.
 
 ## Current Hardening Areas
 
-The following areas are the main hardening backlog relative to the broader target described in [`docs/tech.md`](./docs/tech.md):
+The main hardening backlog relative to the broader target described in [`docs/tech.md`](./docs/tech.md):
 
 - stronger Docker lifecycle management and health-driven state transitions
 - production-ready browser crash recovery and degraded-state handling
-- file/browser integration coverage
+- file and browser integration coverage
 - broader end-to-end and failure-mode coverage
 
 ## Development Notes
 
 - The project targets Python 3.11+.
 - The API server is implemented with FastAPI.
-- WebSocket proxying is designed around CDP and VNC relay use cases.
+- WebSocket proxying is designed around CDP and session relay use cases.
 - File operations are constrained to the sandbox workspace root.
 - Containerized API deployment uses Docker-outside-of-Docker via `/var/run/docker.sock`.
-- The current implementation favors a practical MVP structure over premature distribution or multi-tenant orchestration.
+- The current implementation favors a practical MVP structure over premature multi-tenant orchestration.
 
 ## Roadmap
 
-The intended implementation order remains:
-
-1. Harden the runtime container until Chromium, CDP, and VNC are reliable.
-2. Expand Playwright / CDP compatibility validation beyond low-level smoke checks.
-3. Strengthen VNC session management and WebSocket lifecycle behavior.
+1. Harden the runtime container until Chromium, CDP, and desktop access are reliable.
+2. Expand Playwright and CDP compatibility validation beyond low-level smoke checks.
+3. Strengthen session management and WebSocket lifecycle behavior.
 4. Expand file and integration testing coverage.
 5. Add failure injection tests for browser restarts and runtime degradation.
 6. Add deployment polish, observability, and production hardening.
