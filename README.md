@@ -14,14 +14,14 @@ A browser sandbox platform for AI agents, combining CDP automation, GUI-level sc
 
 ## Desktop Options Comparison
 
-| Feature | `xvfb_vnc` | `xpra` |
-| --- | --- | --- |
-| Stack | Xvfb + x11vnc + noVNC | Xpra Server + HTML5 Client |
-| Latency | Medium | Low |
-| Clipboard | One-way (manual sync) | Bidirectional auto-sync |
-| Network Adaptation | Good | Excellent |
-| Use Case | Automation-first, occasional human check | Frequent human collaboration and debugging |
-| Usage | Set `kind: "xvfb_vnc"` on create | Set `kind: "xpra"` on create |
+| Feature            | `xvfb_vnc`                               | `xpra`                                     |
+| ------------------ | ---------------------------------------- | ------------------------------------------ |
+| Stack              | Xvfb + x11vnc + noVNC                    | Xpra Server + HTML5 Client                 |
+| Latency            | Medium                                   | Low                                        |
+| Clipboard          | One-way (manual sync)                    | Bidirectional auto-sync                    |
+| Network Adaptation | Good                                     | Excellent                                  |
+| Use Case           | Automation-first, occasional human check | Frequent human collaboration and debugging |
+| Usage              | Set `kind: "xvfb_vnc"` on create         | Set `kind: "xpra"` on create               |
 
 How to choose:
 
@@ -393,15 +393,6 @@ The main hardening backlog relative to the broader target described in [`docs/te
 - File operations are constrained to the sandbox workspace root.
 - Containerized API deployment uses Docker-outside-of-Docker via `/var/run/docker.sock`.
 - The current implementation favors a practical MVP structure over premature multi-tenant orchestration.
-
-## Roadmap
-
-1. Harden the runtime container until Chromium, CDP, and desktop access are reliable.
-2. Expand Playwright and CDP compatibility validation beyond low-level smoke checks.
-3. Strengthen session management and WebSocket lifecycle behavior.
-4. Expand file and integration testing coverage.
-5. Add failure injection tests for browser restarts and runtime degradation.
-6. Add deployment polish, observability, and production hardening.
 
 ## License
 

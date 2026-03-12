@@ -13,7 +13,7 @@ The source of truth for product and system design is `docs/tech.md`.
 ## Working Rules
 
 - Prefer small, verifiable changes over speculative refactors.
-- Keep the API contract aligned with the `/sandboxes/{sandbox_id}/...` routing model.
+- Keep the API contract aligned with the `/sandbox/{sandbox_id}/...` routing model.
 - Treat the runtime container and the API server as one integrated system. Do not change one without validating the other.
 - Avoid introducing host-specific absolute paths into code, docs, tests, or examples.
 - Use **Conventional Commits** for all `git commit` messages.
