@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from app.models.sandbox import RuntimeEndpoint, SandboxRecord, SandboxStatus
+from app.services.docker_adapter import ContainerCreateResult
 from app.services.lifecycle import SandboxLifecycleService
 from app.services.registry import registry
 
@@ -131,7 +132,7 @@ async def test_restart_browser_recreates_container_after_removing_stale_runtime(
     monkeypatch.setattr("app.services.lifecycle.docker_adapter.remove_container", removed.append)
     monkeypatch.setattr(
         "app.services.lifecycle.docker_adapter.create_container",
-        lambda **_: ("cid-2", "10.0.0.2"),
+        lambda **_: ContainerCreateResult(container_id="cid-2", host="10.0.0.2"),
     )
     monkeypatch.setattr(service, "_wait_until_ready", fake_wait_until_ready)
 

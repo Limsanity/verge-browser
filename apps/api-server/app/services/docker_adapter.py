@@ -15,6 +15,13 @@ class ManagedContainer:
     sandbox_id: str | None
 
 
+@dataclass(frozen=True)
+class ContainerCreateResult:
+    container_id: str | None
+    host: str
+    error: str | None = None
+
+
 class DockerAdapter:
     managed_label_key = "verge.managed"
     managed_label_value = "true"
@@ -52,11 +59,11 @@ class DockerAdapter:
         height: int,
         default_url: str | None,
         image: str | None,
-    ) -> tuple[str | None, str]:
+    ) -> ContainerCreateResult:
         settings = get_settings()
         image_name = image or settings.runtime_image_for_kind(kind)
         if not self.image_exists(image_name):
-            return None, "127.0.0.1"
+            return ContainerCreateResult(container_id=None, host="127.0.0.1", error=f"runtime image '{image_name}' is not built locally")
         container_name = f"verge-sandbox-{sandbox_id}"
         display = settings.display_for_kind(kind)
         session_port = settings.session_port_for_kind(kind)
@@ -85,19 +92,24 @@ class DockerAdapter:
             f"DEFAULT_URL={default_url or settings.sandbox_default_url}",
             "-v",
             f"{workspace_dir}:/workspace",
-            image_name,
         ]
         if kind == SandboxKind.XPRA:
             cmd.extend(["-e", f"XPRA_DISPLAY={display}", "-e", f"XPRA_PORT={session_port}"])
         else:
             cmd.extend(["-e", f"XVFB_WHD={width}x{height}x24", "-e", f"WEBSOCKET_PROXY_PORT={session_port}"])
+        cmd.append(image_name)
         try:
             proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
-        except (FileNotFoundError, subprocess.CalledProcessError):
-            return None, "127.0.0.1"
+        except FileNotFoundError:
+            return ContainerCreateResult(container_id=None, host="127.0.0.1", error="docker CLI not found on PATH")
+        except subprocess.CalledProcessError as exc:
+            detail = (exc.stderr or exc.stdout or "").strip()
+            if not detail:
+                detail = "docker run exited with a non-zero status"
+            return ContainerCreateResult(container_id=None, host="127.0.0.1", error=detail)
         container_id = proc.stdout.strip()
         host = self.inspect_container_ip(container_id)
-        return container_id, host or "127.0.0.1"
+        return ContainerCreateResult(container_id=container_id, host=host or "127.0.0.1")
 
     def inspect_container_ip(self, container_id: str) -> str | None:
         try:

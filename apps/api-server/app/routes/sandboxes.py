@@ -106,8 +106,8 @@ async def pause_sandbox(sandbox_id: str) -> ApiEnvelope[dict[str, bool]]:
 @router.post("/{sandbox_id}/resume", response_model=ApiEnvelope[dict[str, bool]])
 async def resume_sandbox(sandbox_id: str) -> ApiEnvelope[dict[str, bool]]:
     sandbox = require_sandbox(sandbox_id)
-    if sandbox.status != SandboxStatus.STOPPED:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"sandbox '{sandbox_id}' is not stopped; call pause first or wait until the sandbox reaches STOPPED before resuming")
+    if sandbox.status not in {SandboxStatus.STOPPED, SandboxStatus.FAILED}:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"sandbox '{sandbox_id}' is neither stopped nor failed; call pause first or wait until the sandbox reaches STOPPED before resuming")
     resumed = await lifecycle_service.resume(sandbox_id)
     if not resumed:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"sandbox '{sandbox_id}' could not be resumed; inspect sandbox.metadata.runtime_error for the concrete runtime failure")

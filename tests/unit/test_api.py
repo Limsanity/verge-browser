@@ -124,6 +124,16 @@ def test_create_sandbox_accepts_explicit_kind() -> None:
     assert body(created)["kind"] == "xpra"
 
 
+def test_failed_sandbox_can_attempt_resume() -> None:
+    created = client.post("/sandbox", json={"alias": "failed-demo"}, headers=AUTH_HEADERS)
+    assert created.status_code == 201
+    sandbox_id = body(created)["id"]
+
+    response = client.post(f"/sandbox/{sandbox_id}/resume", headers=AUTH_HEADERS)
+    assert response.status_code == 409
+    assert "could not be resumed" in response.json()["message"]
+
+
 def test_session_ticket_requires_existing_sandbox() -> None:
     response = client.post("/sandbox/sb_missing/session/apply", headers=AUTH_HEADERS)
     assert response.status_code == 404

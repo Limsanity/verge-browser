@@ -37,16 +37,24 @@ class SandboxLifecycleService:
         status = SandboxStatus.FAILED
         runtime = runtime_endpoint_for_kind(req.kind)
         if docker_adapter.is_available():
-            container_id, host = docker_adapter.create_container(
-                sandbox_id=sandbox_id,
-                kind=req.kind,
-                workspace_dir=workspace,
-                width=req.width,
-                height=req.height,
-                default_url=req.default_url,
-                image=req.image,
-            )
-            status = SandboxStatus.STARTING if container_id else SandboxStatus.FAILED
+            image_name = req.image or settings.runtime_image_for_kind(req.kind)
+            if not docker_adapter.image_exists(image_name):
+                metadata["runtime_error"] = f"runtime image '{image_name}' is not built locally"
+            else:
+                create_result = docker_adapter.create_container(
+                    sandbox_id=sandbox_id,
+                    kind=req.kind,
+                    workspace_dir=workspace,
+                    width=req.width,
+                    height=req.height,
+                    default_url=req.default_url,
+                    image=req.image,
+                )
+                container_id = create_result.container_id
+                host = create_result.host
+                if container_id is None:
+                    metadata["runtime_error"] = create_result.error or "sandbox container failed to start"
+                status = SandboxStatus.STARTING if container_id else SandboxStatus.FAILED
         else:
             metadata["runtime_error"] = "docker daemon unavailable"
 
@@ -128,7 +136,7 @@ class SandboxLifecycleService:
 
     async def resume(self, sandbox_id: str) -> bool:
         sandbox = registry.get(sandbox_id) or registry.get_by_alias(sandbox_id)
-        if sandbox is None or sandbox.status != SandboxStatus.STOPPED:
+        if sandbox is None or sandbox.status not in {SandboxStatus.STOPPED, SandboxStatus.FAILED}:
             return False
         if not docker_adapter.is_available():
             sandbox.status = SandboxStatus.FAILED
@@ -136,7 +144,14 @@ class SandboxLifecycleService:
             sandbox.metadata["runtime_error"] = "docker daemon unavailable"
             registry.put(sandbox)
             return False
-        container_id, host = docker_adapter.create_container(
+        image_name = sandbox.image or get_settings().runtime_image_for_kind(sandbox.kind)
+        if not docker_adapter.image_exists(image_name):
+            sandbox.status = SandboxStatus.FAILED
+            sandbox.updated_at = utcnow()
+            sandbox.metadata["runtime_error"] = f"runtime image '{image_name}' is not built locally"
+            registry.put(sandbox)
+            return False
+        create_result = docker_adapter.create_container(
             sandbox_id=sandbox.id,
             kind=sandbox.kind,
             workspace_dir=sandbox.workspace_dir,
@@ -145,10 +160,12 @@ class SandboxLifecycleService:
             default_url=None,
             image=sandbox.image,
         )
+        container_id = create_result.container_id
+        host = create_result.host
         if not container_id:
             sandbox.status = SandboxStatus.FAILED
             sandbox.updated_at = utcnow()
-            sandbox.metadata["runtime_error"] = "sandbox container failed to start"
+            sandbox.metadata["runtime_error"] = create_result.error or "sandbox container failed to start"
             registry.put(sandbox)
             return False
         sandbox.container_id = container_id
@@ -194,7 +211,7 @@ class SandboxLifecycleService:
             if sandbox.container_id:
                 docker_adapter.remove_container(sandbox.container_id)
 
-            container_id, host = docker_adapter.create_container(
+            create_result = docker_adapter.create_container(
                 sandbox_id=sandbox.id,
                 kind=sandbox.kind,
                 workspace_dir=sandbox.workspace_dir,
@@ -203,10 +220,12 @@ class SandboxLifecycleService:
                 default_url=None,
                 image=sandbox.image,
             )
+            container_id = create_result.container_id
+            host = create_result.host
             if not container_id:
                 sandbox.status = SandboxStatus.FAILED
                 sandbox.updated_at = utcnow()
-                sandbox.metadata["runtime_error"] = "sandbox container failed to start"
+                sandbox.metadata["runtime_error"] = create_result.error or "sandbox container failed to start"
                 registry.put(sandbox)
                 return False
 
