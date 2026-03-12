@@ -20,8 +20,6 @@ verge-browser sandbox restart shopping --json
 verge-browser sandbox pause shopping --json
 verge-browser sandbox resume shopping --json
 verge-browser sandbox rm shopping --json
-verge-browser browser info shopping --json
-verge-browser browser viewport shopping --json
 verge-browser browser screenshot shopping --output ./shot.png --json
 verge-browser browser actions shopping --input ./actions.json --json
 verge-browser files list shopping /workspace --json
@@ -38,7 +36,6 @@ verge-browser files rm shopping /workspace/notes.txt --json
 - JSON 业务响应会自动解包 `{ code, message, data }`
 - `sandbox cdp` 会调用 `POST /sandbox/{id}/cdp/apply`
 - `sandbox session` 会调用 `POST /sandbox/{id}/session/apply`
-- `browser info` 和 `browser viewport` 都基于 `GET /sandbox/{id}` 的聚合信息
 - `sandbox create` 默认创建 `xvfb_vnc` 沙盒，也可通过 `--kind xpra` 选择 Xpra
 
 ## Python SDK

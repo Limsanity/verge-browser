@@ -131,10 +131,6 @@ verge-browser sandbox session shopping --json
 # Restart Chromium inside a sandbox
 verge-browser sandbox restart shopping --json
 
-# Inspect the active browser window
-verge-browser browser info shopping --json
-verge-browser browser viewport shopping --json
-
 # Save a screenshot locally
 verge-browser browser screenshot shopping --output ./shot.png --json
 

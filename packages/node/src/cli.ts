@@ -220,7 +220,7 @@ function createCli(clientFactory: (options: VergeClientOptions) => VergeClient, 
 
   cli
     .command('browser <action> <idOrAlias>', 'Inspect or control the browser inside a sandbox')
-    .usage('verge-browser browser <info|viewport|screenshot|actions> <idOrAlias> [options]')
+    .usage('verge-browser browser <screenshot|actions> <idOrAlias> [options]')
     .option('--type <type>', 'Screenshot type: window or page')
     .option('--format <format>', 'Screenshot format: png, jpeg, or webp')
     .option('--target-id <targetId>', 'Optional CDP target id for page screenshots')
@@ -229,8 +229,6 @@ function createCli(clientFactory: (options: VergeClientOptions) => VergeClient, 
     .option('--payload <json>', 'Inline JSON payload for browser actions')
     .action(async (action: string, idOrAlias: string, options: BrowserScreenshotOptions & BrowserActionsOptions) => {
       const client = clientFactory(toClientOptions(options));
-      if (action === 'info') return client.getBrowserInfo(idOrAlias);
-      if (action === 'viewport') return client.getBrowserViewport(idOrAlias);
       if (action === 'screenshot') {
         const screenshot = await client.getBrowserScreenshot(idOrAlias, {
           ...(options.type ? { type: options.type } : {}),

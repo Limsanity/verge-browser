@@ -89,6 +89,70 @@ class VergeClient:
     def restart_browser(self, id_or_alias: str) -> dict[str, Any]:
         return self._request("POST", f"/sandbox/{quote(id_or_alias, safe='')}/browser/restart", json={"level": "hard"})
 
+    def get_browser_info(self, id_or_alias: str) -> dict[str, Any]:
+        return self.get_sandbox(id_or_alias)["browser"]
+
+    def get_browser_viewport(self, id_or_alias: str) -> dict[str, Any]:
+        browser = self.get_browser_info(id_or_alias)
+        width = browser.get("viewport", {}).get("width", 1280)
+        height = browser.get("viewport", {}).get("height", 1024)
+        return {
+            "window_viewport": browser.get("window_viewport") or {"x": 0, "y": 0, "width": width, "height": height},
+            "page_viewport": browser.get("page_viewport") or {"x": 0, "y": 0, "width": width, "height": height},
+            "active_window": browser.get("active_window"),
+        }
+
+    def get_browser_screenshot(
+        self,
+        id_or_alias: str,
+        *,
+        type: str = "page",
+        format: str = "jpeg",
+        target_id: str | None = None,
+        quality: int | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"type": type, "format": format}
+        if target_id is not None:
+            payload["target_id"] = target_id
+        if quality is not None:
+            payload["quality"] = quality
+        return self._request("POST", f"/sandbox/{quote(id_or_alias, safe='')}/browser/screenshot", json=payload)
+
+    def execute_browser_actions(self, id_or_alias: str, actions: list[dict[str, Any]], *, continue_on_error: bool = False, screenshot_after: bool = False) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "actions": actions,
+            "continue_on_error": continue_on_error,
+            "screenshot_after": screenshot_after,
+        }
+        return self._request("POST", f"/sandbox/{quote(id_or_alias, safe='')}/browser/actions", json=payload)
+
+    def list_files(self, id_or_alias: str, path: str = "/workspace") -> list[dict[str, Any]]:
+        return self._request("GET", f"/sandbox/{quote(id_or_alias, safe='')}/files/list", params={"path": path})
+
+    def read_file(self, id_or_alias: str, path: str) -> dict[str, Any]:
+        return self._request("GET", f"/sandbox/{quote(id_or_alias, safe='')}/files/read", params={"path": path})
+
+    def write_file(self, id_or_alias: str, path: str, content: str, *, overwrite: bool = False) -> dict[str, Any]:
+        payload = {"path": path, "content": content, "overwrite": overwrite}
+        return self._request("POST", f"/sandbox/{quote(id_or_alias, safe='')}/files/write", json=payload)
+
+    def upload_file(self, id_or_alias: str, path: str, data: bytes | str, *, filename: str | None = None) -> dict[str, Any]:
+        from io import BytesIO
+        files = {"upload": (filename or path.split("/")[-1], BytesIO(data if isinstance(data, bytes) else data.encode()))}
+        return self._request("POST", f"/sandbox/{quote(id_or_alias, safe='')}/files/upload", files=files)
+
+    def download_file(self, id_or_alias: str, path: str) -> dict[str, Any]:
+        response = self._client.get(
+            f"/sandbox/{quote(id_or_alias, safe='')}/files/download",
+            params={"path": path},
+            headers=self._headers(),
+        )
+        response.raise_for_status()
+        return {"path": path, "data": response.content, "content_type": response.headers.get("content-type")}
+
+    def delete_file(self, id_or_alias: str, path: str) -> dict[str, Any]:
+        return self._request("DELETE", f"/sandbox/{quote(id_or_alias, safe='')}/files", params={"path": path})
+
     def get_cdp_info(self, id_or_alias: str, *, mode: str = "reusable", ttl_sec: int | None = None) -> dict[str, Any]:
         payload: dict[str, Any] = {"mode": mode}
         if ttl_sec is not None:

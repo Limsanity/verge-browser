@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Purpose: Restart Chromium inside an existing sandbox and print browser info before and after the restart.
+# Purpose: Restart Chromium inside an existing sandbox and print sandbox info before and after the restart.
 
 set -euo pipefail
 

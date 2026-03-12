@@ -87,7 +87,7 @@ The repository currently implements:
 
 - sandbox create / get / pause / resume / delete flow with Docker-backed runtime startup
 - persisted workspace metadata and startup recovery for stopped sandboxes
-- browser info, viewport, screenshot, actions, restart, and CDP proxying
+- browser screenshot, actions, restart, and CDP proxying
 - ticket-based session entry with noVNC or Xpra asset proxying
 - workspace-scoped file list, read, write, upload, download, and delete operations
 - an admin web console built into static assets and served by the API at `/admin`
@@ -212,12 +212,6 @@ Create a sandbox:
 
 ```bash
 verge-browser sandbox create --alias test --width 1440 --height 900
-```
-
-Get browser info:
-
-```bash
-verge-browser browser info test
 ```
 
 Take a screenshot:

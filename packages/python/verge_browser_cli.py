@@ -43,9 +43,55 @@ def build_parser() -> argparse.ArgumentParser:
     update.add_argument("id_or_alias")
     update.add_argument("--alias", required=True)
 
-    for name in ("pause", "resume", "rm", "cdp", "session"):
+    for name in ("pause", "resume", "rm", "restart", "cdp", "session"):
         cmd = sandbox_subparsers.add_parser(name)
         cmd.add_argument("id_or_alias")
+
+    # Browser subcommand
+    browser = subparsers.add_parser("browser")
+    browser_subparsers = browser.add_subparsers(dest="browser_command", required=True)
+
+    screenshot = browser_subparsers.add_parser("screenshot")
+    screenshot.add_argument("id_or_alias")
+    screenshot.add_argument("--type", default="page", choices=["window", "page"])
+    screenshot.add_argument("--format", default="jpeg", choices=["png", "jpeg", "webp"])
+    screenshot.add_argument("--target-id", default=None)
+    screenshot.add_argument("--output", default=None, help="Write screenshot to file")
+
+    actions = browser_subparsers.add_parser("actions")
+    actions.add_argument("id_or_alias")
+    actions.add_argument("--input", required=True, help="JSON file with actions payload")
+
+    # Files subcommand
+    files = subparsers.add_parser("files")
+    files_subparsers = files.add_subparsers(dest="files_command", required=True)
+
+    list_cmd = files_subparsers.add_parser("list")
+    list_cmd.add_argument("id_or_alias")
+    list_cmd.add_argument("path", nargs="?", default="/workspace")
+
+    read = files_subparsers.add_parser("read")
+    read.add_argument("id_or_alias")
+    read.add_argument("path")
+
+    write = files_subparsers.add_parser("write")
+    write.add_argument("id_or_alias")
+    write.add_argument("path")
+    write.add_argument("--content", required=True)
+    write.add_argument("--overwrite", action="store_true")
+
+    upload = files_subparsers.add_parser("upload")
+    upload.add_argument("id_or_alias")
+    upload.add_argument("local_path")
+
+    download = files_subparsers.add_parser("download")
+    download.add_argument("id_or_alias")
+    download.add_argument("path")
+    download.add_argument("--output", default=None)
+
+    rm = files_subparsers.add_parser("rm")
+    rm.add_argument("id_or_alias")
+    rm.add_argument("path")
 
     return parser
 
@@ -80,6 +126,57 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _dispatch(client: VergeClient, args: argparse.Namespace) -> Any:
+    if args.command == "browser":
+        if args.browser_command == "screenshot":
+            result = client.get_browser_screenshot(
+                args.id_or_alias,
+                type=args.type,
+                format=args.format,
+                target_id=args.target_id,
+            )
+            if args.output:
+                import base64
+                data = base64.b64decode(result["data_base64"])
+                with open(args.output, "wb") as f:
+                    f.write(data)
+                return {"output": args.output, **result}
+            return result
+        if args.browser_command == "actions":
+            import json
+            with open(args.input, "r") as f:
+                payload = json.load(f)
+            return client.execute_browser_actions(
+                args.id_or_alias,
+                payload.get("actions", []),
+                continue_on_error=payload.get("continue_on_error", False),
+                screenshot_after=payload.get("screenshot_after", False),
+            )
+        raise VergeConfigError(f"unsupported browser command: {args.browser_command}")
+
+    if args.command == "files":
+        if args.files_command == "list":
+            return client.list_files(args.id_or_alias, args.path)
+        if args.files_command == "read":
+            result = client.read_file(args.id_or_alias, args.path)
+            return result if args.json_output else result.get("content", "")
+        if args.files_command == "write":
+            return client.write_file(args.id_or_alias, args.path, args.content, overwrite=args.overwrite)
+        if args.files_command == "upload":
+            with open(args.local_path, "rb") as f:
+                data = f.read()
+            return client.upload_file(args.id_or_alias, args.local_path, data)
+        if args.files_command == "download":
+            result = client.download_file(args.id_or_alias, args.path)
+            if args.output:
+                with open(args.output, "wb") as f:
+                    f.write(result["data"])
+                return {"path": args.path, "output": args.output}
+            import base64
+            return {"path": args.path, "data_base64": base64.b64encode(result["data"]).decode()}
+        if args.files_command == "rm":
+            return client.delete_file(args.id_or_alias, args.path)
+        raise VergeConfigError(f"unsupported files command: {args.files_command}")
+
     if args.command != "sandbox":
         raise VergeConfigError(f"unsupported command: {args.command}")
 
@@ -104,6 +201,8 @@ def _dispatch(client: VergeClient, args: argparse.Namespace) -> Any:
         return client.resume_sandbox(args.id_or_alias)
     if args.sandbox_command == "rm":
         return client.delete_sandbox(args.id_or_alias)
+    if args.sandbox_command == "restart":
+        return client.restart_browser(args.id_or_alias)
     if args.sandbox_command == "cdp":
         return client.get_cdp_info(args.id_or_alias)
     if args.sandbox_command == "session":
