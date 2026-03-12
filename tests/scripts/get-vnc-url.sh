@@ -24,9 +24,9 @@ if [[ -n "$VNC_TICKET_TTL_SEC" ]]; then
 fi
 ticket_payload="$(printf '%s}' "$ticket_payload")"
 
-ticket_json="$(api_json POST "$BASE_URL/sandboxes/$SANDBOX_ID/vnc/tickets" -H 'Content-Type: application/json' -d "$ticket_payload")"
+ticket_json="$(api_json POST "$BASE_URL/sandbox/$SANDBOX_ID/vnc/apply" -H 'Content-Type: application/json' -d "$ticket_payload")"
 ticket="$(printf '%s' "$ticket_json" | json_get 'data["ticket"]')"
-vnc_url="$BASE_URL/sandboxes/$SANDBOX_ID/vnc/?ticket=$ticket&autoconnect=true&resize=scale"
+vnc_url="$(printf '%s' "$ticket_json" | json_get 'data["vnc_url"]')"
 
 echo
 echo "Open this URL in a browser:"

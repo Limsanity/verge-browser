@@ -31,6 +31,14 @@ verge-browser files download shopping /workspace/notes.txt --output ./notes.txt 
 verge-browser files rm shopping /workspace/notes.txt --json
 ```
 
+说明：
+
+- SDK 与 CLI 默认请求 `/sandbox/...`
+- JSON 业务响应会自动解包 `{ code, message, data }`
+- `sandbox cdp` 会调用 `POST /sandbox/{id}/cdp/apply`
+- `sandbox vnc` 会调用 `POST /sandbox/{id}/vnc/apply`
+- `browser info` 和 `browser viewport` 都基于 `GET /sandbox/{id}` 的聚合信息
+
 ## Python SDK
 
 ```python
@@ -39,12 +47,30 @@ from verge_browser import VergeClient
 client = VergeClient()
 sandbox = client.create_sandbox(alias="shopping", width=1440, height=900)
 detail = client.get_sandbox("shopping")
-cdp = client.get_cdp_info("shopping")
+cdp = client.get_cdp_info("shopping", mode="reusable", ttl_sec=300)
 vnc = client.get_vnc_url("shopping")
+```
+
+`cdp["cdp_url"]` 是可直接使用的带签名 ticket 的 WebSocket 地址。
+
+## Node SDK
+
+```ts
+import { VergeClient } from "verge-browser";
+
+const client = new VergeClient({
+  baseUrl: "http://127.0.0.1:8000",
+  token: process.env.VERGE_BROWSER_TOKEN,
+});
+
+const sandbox = await client.createSandbox({ alias: "shopping" });
+const detail = await client.getSandbox("shopping");
+const cdp = await client.getCdpInfo("shopping", { mode: "reusable", ttl_sec: 300 });
+const vnc = await client.getVncUrl("shopping");
 ```
 
 ## 人机协同工作流
 
 1. Agent 创建 sandbox 并执行初始自动化。
-2. 需要人工处理登录或验证码时，调用 `get_vnc_url()` 或 `verge-browser sandbox vnc <id-or-alias>`。
-3. 人类完成接管后，Agent 再通过 `get_cdp_info()` 或 CLI 的 `sandbox cdp` 继续自动化。
+2. 需要人工接管时，调用 `get_vnc_url()` 或 `verge-browser sandbox vnc <id-or-alias>`。
+3. 人类完成操作后，Agent 通过 `get_cdp_info()` 或 `verge-browser sandbox cdp <id-or-alias>` 继续自动化。

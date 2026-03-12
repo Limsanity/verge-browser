@@ -13,14 +13,14 @@ DEFAULT_URL="${DEFAULT_URL:-https://github.com/zzzgydi/verge-browser}"
 
 payload=$(printf '{"width":%s,"height":%s,"default_url":"%s"}' "$WIDTH" "$HEIGHT" "$DEFAULT_URL")
 
-response="$(api_json POST "$BASE_URL/sandboxes" -H 'Content-Type: application/json' -d "$payload")"
+response="$(api_json POST "$BASE_URL/sandbox" -H 'Content-Type: application/json' -d "$payload")"
 sandbox_id="$(printf '%s' "$response" | json_get 'data["id"]')"
 
 printf '%s\n' "$response" | json_dump_pretty
 echo
 echo "Sandbox created."
 echo "export SANDBOX_ID=$sandbox_id"
-echo "Sandbox URL: $BASE_URL/sandboxes/$sandbox_id"
-echo "CDP info:    $BASE_URL/sandboxes/$sandbox_id/browser/cdp/info"
-echo "VNC ticket:  $BASE_URL/sandboxes/$sandbox_id/vnc/tickets"
+echo "Sandbox URL: $BASE_URL/sandbox/$sandbox_id"
+echo "CDP apply:   $BASE_URL/sandbox/$sandbox_id/cdp/apply"
+echo "VNC apply:   $BASE_URL/sandbox/$sandbox_id/vnc/apply"
 echo "VNC example: VNC_TICKET_MODE=reusable VNC_TICKET_TTL_SEC=300 $SCRIPT_DIR/get-vnc-url.sh"

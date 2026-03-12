@@ -4,30 +4,19 @@ This document describes the current Verge Browser control plane API.
 
 Base convention:
 
-- REST resources are scoped under `/sandboxes/{sandbox_id}/...`
+- REST resources are scoped under `/sandbox/{sandbox_id}/...`
 - WebSocket resources follow the same sandbox scoping model
+- All JSON business APIs return `{ "code": number, "message": string, "data": ... }`
+- Success responses use `code = 0`
+- Error responses keep `data = null` and put actionable detail in `message`
 - All business APIs require `Authorization: Bearer <admin-token>`
 - `GET /healthz` remains anonymous
-- The admin web console is served by the API at `/admin`
-
-## Admin Web
-
-### `GET /admin`
-
-Returns the bundled admin SPA entrypoint.
-
-Notes:
-
-- Frontend build output lives under `apps/api-server/app/static/admin`.
-- `GET /admin/{path}` serves static assets directly and falls back to `index.html` for SPA routes.
 
 ## Health
 
 ### `GET /healthz`
 
-Returns a basic liveness payload.
-
-Example response:
+Returns:
 
 ```json
 {
@@ -35,25 +24,41 @@ Example response:
 }
 ```
 
-## Sandboxes
+## Response Envelope
 
-### `POST /sandboxes`
+All JSON business APIs use:
 
-Create a sandbox and start the runtime if Docker is available.
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {}
+}
+```
 
-Persistence notes:
+Error example:
 
-- The sandbox workspace is created under the configured sandbox base directory.
-- Chromium uses `/workspace/browser-profile`, so cookies and local storage survive browser restarts and `pause` / `resume`.
-- The API server persists sandbox metadata to disk and reloads it on service startup. Reloaded sandboxes come back as `STOPPED` until resumed.
+```json
+{
+  "code": 409,
+  "message": "sandbox 'demo' is not stopped; call pause first or wait until the sandbox reaches STOPPED before resuming",
+  "data": null
+}
+```
 
-Request body:
+## Sandbox
+
+### `POST /sandbox`
+
+Create a sandbox.
+
+Request:
 
 ```json
 {
   "alias": "manual-test",
   "image": "verge-browser-runtime:latest",
-  "default_url": "https://github.com/zzzgydi/verge-browser",
+  "default_url": "https://example.com",
   "width": 1440,
   "height": 900,
   "metadata": {
@@ -62,77 +67,84 @@ Request body:
 }
 ```
 
-Response highlights:
+Response notes:
 
-- `id`: sandbox ID
-- `alias`: human-readable sandbox alias
-- `status`: lifecycle status
-- `updated_at` / `last_active_at`: lifecycle timestamps
-- `browser.cdp_url`: external CDP proxy URL
-- `browser.vnc_entry_base_url`: VNC landing URL prefix
-- `browser.vnc_ticket_endpoint`: endpoint for a one-time VNC ticket
+- Creation and detail responses no longer expose `cdp_url` or `vnc_url`
+- Browser runtime info is aggregated under `data.browser`
 
-### `GET /sandboxes`
+### `GET /sandbox`
 
-Return all sandboxes with status, alias, timestamps, metadata, CDP URL, and VNC entry info.
+List sandboxes.
 
-### `GET /sandboxes/{sandbox_id}`
+### `GET /sandbox/{sandbox_id}`
 
-Return current sandbox metadata and browser access info. The path parameter accepts either the real sandbox ID or the configured alias.
+Get sandbox detail by sandbox ID or alias.
 
-### `PATCH /sandboxes/{sandbox_id}`
-
-Update mutable sandbox fields.
-
-Request body:
+Example `data` payload:
 
 ```json
 {
-  "alias": "manual-test-renamed",
-  "metadata": {
-    "owner": "agent"
+  "id": "sb_123",
+  "alias": "manual-test",
+  "status": "RUNNING",
+  "created_at": "2026-03-12T10:00:00Z",
+  "updated_at": "2026-03-12T10:00:05Z",
+  "last_active_at": "2026-03-12T10:00:05Z",
+  "width": 1440,
+  "height": 900,
+  "metadata": {},
+  "container_id": "docker-container-id",
+  "browser": {
+    "browser_version": "Chrome/123.0.x",
+    "protocol_version": "1.3",
+    "web_socket_debugger_url_present": true,
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "window_viewport": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 900
+    },
+    "page_viewport": {
+      "x": 0,
+      "y": 80,
+      "width": 1440,
+      "height": 820
+    },
+    "active_window": {
+      "window_id": "4194307",
+      "x": 0,
+      "y": 0,
+      "title": "Chromium"
+    }
   }
 }
 ```
 
-### `DELETE /sandboxes/{sandbox_id}`
+### `PATCH /sandbox/{sandbox_id}`
 
-Destroy the sandbox and delete the workspace directory. The path parameter accepts either the real sandbox ID or the configured alias.
+Update mutable fields.
 
-### `POST /sandboxes/{sandbox_id}/pause`
+### `DELETE /sandbox/{sandbox_id}`
 
-Stop and remove the runtime container while keeping the sandbox workspace on disk.
+Delete a sandbox.
 
-Example response:
+### `POST /sandbox/{sandbox_id}/pause`
 
-```json
-{
-  "ok": true
-}
-```
+Pause a sandbox.
 
-### `POST /sandboxes/{sandbox_id}/resume`
+### `POST /sandbox/{sandbox_id}/resume`
 
-Recreate the runtime container for a sandbox in `STOPPED` state and remount the existing workspace.
+Resume a stopped sandbox.
 
-Behavior notes:
+### `POST /sandbox/{sandbox_id}/browser/restart`
 
-- Returns `409` if the sandbox is not currently `STOPPED`.
-- Returns `{ "ok": false }` if resume was attempted from `STOPPED` but the runtime could not be started.
+Restart Chromium.
 
-Example response:
-
-```json
-{
-  "ok": true
-}
-```
-
-### `POST /sandboxes/{sandbox_id}/browser/restart`
-
-Restart Chromium inside the sandbox.
-
-Request body:
+Request:
 
 ```json
 {
@@ -142,31 +154,28 @@ Request body:
 
 ## Browser
 
-### `GET /sandboxes/{sandbox_id}/browser/info`
+### `POST /sandbox/{sandbox_id}/browser/screenshot`
 
-Returns browser version, protocol version, whether a CDP WebSocket is available, and the active window viewport.
+Capture a screenshot.
 
-### `GET /sandboxes/{sandbox_id}/browser/viewport`
-
-Returns the full window viewport, inferred page viewport, and active X11 window metadata.
-
-### `GET /sandboxes/{sandbox_id}/browser/screenshot`
-
-Capture either the full browser window or the active page.
-
-Query parameters:
-
-- `type`: `window` or `page`
-- `format`: `png`, `jpeg`, or `webp`
-- `target_id`: optional CDP target ID for page screenshots
-
-Response shape:
+Request:
 
 ```json
 {
   "type": "page",
-  "format": "png",
-  "media_type": "image/png",
+  "format": "jpeg",
+  "quality": 80,
+  "target_id": "target-id-optional"
+}
+```
+
+Response `data`:
+
+```json
+{
+  "type": "page",
+  "format": "jpeg",
+  "media_type": "image/jpeg",
   "metadata": {
     "width": 1440,
     "height": 900,
@@ -188,113 +197,100 @@ Response shape:
 }
 ```
 
-### `POST /sandboxes/{sandbox_id}/browser/actions`
+### `POST /sandbox/{sandbox_id}/browser/actions`
 
-Execute GUI-level actions through `xdotool`.
+Execute GUI actions through `xdotool`.
 
-Request body:
+### `POST /sandbox/{sandbox_id}/cdp/apply`
+
+Apply for a CDP access ticket and return a ticketed proxy URL.
+
+Request:
 
 ```json
 {
-  "actions": [
-    { "type": "WAIT", "duration_ms": 500 },
-    { "type": "MOVE_TO", "x": 300, "y": 200 },
-    { "type": "CLICK", "x": 300, "y": 200 },
-    { "type": "TYPE_TEXT", "text": "hello verge" },
-    { "type": "HOTKEY", "keys": ["ctrl", "l"] }
-  ],
-  "continue_on_error": false,
-  "screenshot_after": false
+  "mode": "reusable",
+  "ttl_sec": 300
 }
 ```
 
-Supported action types:
+Response `data`:
 
-- `MOVE_TO`
-- `CLICK`
-- `DOUBLE_CLICK`
-- `RIGHT_CLICK`
-- `MOUSE_DOWN`
-- `MOUSE_UP`
-- `DRAG_TO`
-- `SCROLL`
-- `TYPE_TEXT`
-- `KEY_PRESS`
-- `HOTKEY`
-- `WAIT`
+```json
+{
+  "ticket": "<opaque-ticket>",
+  "cdp_url": "wss://api.example.com/sandbox/sb_123/cdp/browser?ticket=hexpayload.signature",
+  "mode": "reusable",
+  "ttl_sec": 300,
+  "expires_at": "2026-03-12T12:34:56Z"
+}
+```
 
-### `GET /sandboxes/{sandbox_id}/browser/cdp/info`
+### `WS /sandbox/{sandbox_id}/cdp/browser`
 
-Returns the external CDP proxy URL and browser protocol metadata.
-
-### `WS /sandboxes/{sandbox_id}/browser/cdp/browser`
-
-Proxy WebSocket for browser-level CDP traffic. Use this URL from Playwright, Puppeteer, or another CDP client.
+Browser-level CDP proxy. Requires `ticket=...` in the query string.
 
 ## VNC
 
-### `POST /sandboxes/{sandbox_id}/vnc/tickets`
+### `POST /sandbox/{sandbox_id}/vnc/apply`
 
-Issue a short-lived, one-time VNC ticket.
+Apply for a VNC access ticket and return a ticketed entry URL.
 
-Example response:
+Request:
 
 ```json
 {
-  "ticket": "hexpayload.signature"
+  "mode": "one_time",
+  "ttl_sec": 60
 }
 ```
 
-### `GET /sandboxes/{sandbox_id}/vnc/?ticket=...`
+Response `data`:
 
-Consumes the ticket, sets the `vnc_session` cookie, and returns the noVNC landing page.
+```json
+{
+  "ticket": "<opaque-ticket>",
+  "vnc_url": "https://api.example.com/sandbox/sb_123/vnc/?ticket=hexpayload.signature",
+  "mode": "one_time",
+  "ttl_sec": 60,
+  "expires_at": "2026-03-12T12:34:56Z"
+}
+```
 
-This is the URL humans should open in a browser.
+### `GET /sandbox/{sandbox_id}/vnc/?ticket=...`
 
-### `GET /sandboxes/{sandbox_id}/vnc/{asset_path}`
+Validate the ticket, mint a short-lived VNC session, and redirect to noVNC.
 
-Proxy for noVNC static assets. Requires a valid `vnc_session` cookie.
+### `GET /sandbox/{sandbox_id}/vnc/{asset_path}`
 
-### `WS /sandboxes/{sandbox_id}/vnc/websockify`
+Proxy noVNC static assets after session validation.
 
-WebSocket proxy for the VNC data channel. Requires a valid `vnc_session` cookie.
+### `WS /sandbox/{sandbox_id}/vnc/websockify`
+
+Proxy the VNC WebSocket after session validation.
 
 ## Files
 
-### `GET /sandboxes/{sandbox_id}/files/list?path=/workspace`
+### `GET /sandbox/{sandbox_id}/files/list?path=/workspace`
 
-List files under a workspace-relative path.
+List files.
 
-### `GET /sandboxes/{sandbox_id}/files/read?path=/workspace/file.txt`
+### `GET /sandbox/{sandbox_id}/files/read?path=/workspace/file.txt`
 
-Read a text file and return its content inline.
+Read a UTF-8 text file.
 
-### `POST /sandboxes/{sandbox_id}/files/write`
+### `POST /sandbox/{sandbox_id}/files/write`
 
-Write a text file.
+Write a UTF-8 text file.
 
-Request body:
+### `POST /sandbox/{sandbox_id}/files/upload`
 
-```json
-{
-  "path": "/workspace/notes.txt",
-  "content": "hello verge",
-  "overwrite": true
-}
-```
+Upload a file using multipart form data.
 
-### `POST /sandboxes/{sandbox_id}/files/upload`
+### `GET /sandbox/{sandbox_id}/files/download?path=/workspace/file.txt`
 
-Upload a multipart file into the sandbox.
+Download a file as binary content. This endpoint returns the raw file body, not the JSON envelope.
 
-Form field:
+### `DELETE /sandbox/{sandbox_id}/files?path=/workspace/file.txt`
 
-- `upload`: file payload
-
-### `GET /sandboxes/{sandbox_id}/files/download?path=/workspace/notes.txt`
-
-Download a file as a regular file response.
-
-### `DELETE /sandboxes/{sandbox_id}/files?path=/workspace/notes.txt`
-
-Delete a file or directory entry inside the workspace.
+Delete a file.
