@@ -2,7 +2,6 @@
   "name": "verge-browser",
   "version": "0.1.0",
   "description": "Node.js SDK and CLI for Verge Browser - A browser sandbox system for agent workflows",
-  "packageManager": "pnpm@9.5.0",
   "type": "module",
   "main": "./dist/src/index.js",
   "module": "./dist/src/index.js",
@@ -45,15 +44,15 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/verge-browser/verge-browser.git",
+    "url": "git+https://github.com/zzzgydi/verge-browser.git",
     "directory": "packages/node"
   },
-  "homepage": "https://github.com/verge-browser/verge-browser#readme",
+  "homepage": "https://github.com/zzzgydi/verge-browser#readme",
   "bugs": {
-    "url": "https://github.com/verge-browser/verge-browser/issues"
+    "url": "https://github.com/zzzgydi/verge-browser/issues"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=18"
   },
   "sideEffects": false,
   "dependencies": {

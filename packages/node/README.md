@@ -1,6 +1,6 @@
 # verge-browser
 
-Node.js SDK and CLI for [Verge Browser](https://github.com/verge-browser/verge-browser) - a browser sandbox system for agent workflows.
+Node.js SDK and CLI for [Verge Browser](https://github.com/zzzgydi/verge-browser) - a browser sandbox system for agent workflows.
 
 ## Features
 
