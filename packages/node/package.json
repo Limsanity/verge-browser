@@ -20,7 +20,7 @@
     "verge-browser": "./dist/src/cli.js"
   },
   "files": [
-    "dist",
+    "dist/src",
     "LICENSE",
     "README.md"
   ],
