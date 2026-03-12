@@ -121,6 +121,8 @@ Open [http://127.0.0.1:8000/admin](http://127.0.0.1:8000/admin) to start using.
 
 For local development, sign in with the default admin token `dev-admin-token` unless you override `VERGE_ADMIN_AUTH_TOKEN`.
 
+Deployment-related environment variables are documented in [`docs/env.md`](./docs/env.md).
+
 ### Option 2: Local Development
 
 Prerequisites:
@@ -195,6 +197,8 @@ docker run -d \
 ```
 
 This mode expects the API container to see the same absolute project path as the host so it can mount sandbox workspaces into runtime containers correctly.
+
+For a complete list of deployment env vars, see [`docs/env.md`](./docs/env.md).
 
 ### Basic Usage Examples
 

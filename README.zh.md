@@ -121,6 +121,8 @@ docker compose -f deployments/docker-compose.yml up api
 
 本地开发时，如未覆盖 `VERGE_ADMIN_AUTH_TOKEN`，可直接使用默认 admin token `dev-admin-token` 登录。
 
+部署相关环境变量可参考 [`docs/env.md`](./docs/env.md)。
+
 ### 方式二：本地开发
 
 前置依赖：
@@ -195,6 +197,8 @@ docker run -d \
 ```
 
 这种方式要求 API 容器看到的项目绝对路径与宿主机一致，这样它在创建运行时容器时才能正确挂载沙箱工作目录。
+
+完整的部署环境变量清单见 [`docs/env.md`](./docs/env.md)。
 
 ### 基本用法示例
 
