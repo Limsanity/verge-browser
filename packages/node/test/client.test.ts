@@ -20,6 +20,7 @@ function sandboxResponse(overrides: Record<string, unknown> = {}) {
   return {
     id: 'sbx-1',
     alias: 'shopping',
+    kind: 'xvfb_vnc',
     status: 'RUNNING',
     created_at: '2026-03-12T00:00:00Z',
     updated_at: '2026-03-12T00:00:00Z',
@@ -50,9 +51,24 @@ test('createSandbox sends metadata and optional fields', async () => {
 
   await client.createSandbox({ metadata: { owner: 'agent' }, default_url: 'https://example.com' });
   assert.deepEqual(JSON.parse(requestBody), {
+    kind: 'xvfb_vnc',
     metadata: { owner: 'agent' },
     default_url: 'https://example.com',
   });
+});
+
+test('createSandbox allows xpra kind override', async () => {
+  let requestBody = '';
+  const client = new VergeClient({
+    token: 'token',
+    fetchImpl: async (_input, init) => {
+      requestBody = String(init?.body ?? '');
+      return createJsonResponse(201, envelope(sandboxResponse({ kind: 'xpra' }), 'sandbox created'));
+    },
+  });
+
+  await client.createSandbox({ kind: 'xpra' });
+  assert.equal(JSON.parse(requestBody).kind, 'xpra');
 });
 
 test('downloadFile returns binary payload and content type', async () => {

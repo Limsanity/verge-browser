@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from app.models.sandbox import SandboxKind
 from app.services.docker_adapter import DockerAdapter
 
 
@@ -10,8 +11,10 @@ def test_create_container_passes_matching_xvfb_and_browser_dimensions(monkeypatc
     adapter = DockerAdapter()
     calls: list[list[str]] = []
 
-    def fake_run(cmd: list[str], check: bool, capture_output: bool, text: bool) -> subprocess.CompletedProcess:
+    def fake_run(cmd: list[str], check: bool, capture_output: bool, text: bool, **kwargs) -> subprocess.CompletedProcess:
         calls.append(cmd)
+        if cmd[:3] == ["docker", "image", "inspect"]:
+            return subprocess.CompletedProcess(cmd, 0, stdout="[]", stderr="")
         if cmd[:2] == ["docker", "run"]:
             return subprocess.CompletedProcess(cmd, 0, stdout="cid-123\n", stderr="")
         if cmd[:2] == ["docker", "inspect"]:
@@ -27,30 +30,72 @@ def test_create_container_passes_matching_xvfb_and_browser_dimensions(monkeypatc
 
     container_id, host = adapter.create_container(
         sandbox_id="sb_test",
+        kind=SandboxKind.XPRA,
         workspace_dir=Path("/tmp/workspace"),
         width=1440,
         height=900,
         default_url="about:blank",
-        image="verge-browser-runtime:latest",
+        image="verge-browser-runtime-xpra:latest",
     )
 
     assert container_id == "cid-123"
     assert host == "172.17.0.2"
-    docker_run = calls[0]
+    docker_run = calls[1]
     assert "--name" in docker_run
     assert "verge-sandbox-sb_test" in docker_run
     assert "verge.managed=true" in docker_run
     assert "verge.sandbox.id=sb_test" in docker_run
-    assert "XVFB_WHD=1440x900x24" in docker_run
+    assert "DISPLAY=:100" in docker_run
+    assert "XPRA_DISPLAY=:100" in docker_run
+    assert "XPRA_PORT=14500" in docker_run
     assert "BROWSER_WINDOW_WIDTH=1440" in docker_run
     assert "BROWSER_WINDOW_HEIGHT=900" in docker_run
+
+
+def test_create_container_uses_xvfb_defaults_for_vnc_kind(monkeypatch) -> None:
+    adapter = DockerAdapter()
+    calls: list[list[str]] = []
+
+    def fake_run(cmd: list[str], check: bool, capture_output: bool, text: bool, **kwargs) -> subprocess.CompletedProcess:
+        calls.append(cmd)
+        if cmd[:3] == ["docker", "image", "inspect"]:
+            return subprocess.CompletedProcess(cmd, 0, stdout="[]", stderr="")
+        if cmd[:2] == ["docker", "run"]:
+            return subprocess.CompletedProcess(cmd, 0, stdout="cid-456\n", stderr="")
+        if cmd[:2] == ["docker", "inspect"]:
+            return subprocess.CompletedProcess(
+                cmd,
+                0,
+                stdout='[{"NetworkSettings":{"Networks":{"bridge":{"IPAddress":"172.17.0.3"}}}}]',
+                stderr="",
+            )
+        raise AssertionError(f"unexpected command: {cmd}")
+
+    monkeypatch.setattr("app.services.docker_adapter.subprocess.run", fake_run)
+
+    container_id, host = adapter.create_container(
+        sandbox_id="sb_vnc",
+        kind=SandboxKind.XVFB_VNC,
+        workspace_dir=Path("/tmp/workspace"),
+        width=1280,
+        height=720,
+        default_url="about:blank",
+        image=None,
+    )
+
+    assert container_id == "cid-456"
+    assert host == "172.17.0.3"
+    docker_run = calls[1]
+    assert "DISPLAY=:99" in docker_run
+    assert "XVFB_WHD=1280x720x24" in docker_run
+    assert "WEBSOCKET_PROXY_PORT=6080" in docker_run
 
 
 def test_remove_managed_containers_removes_all_labeled_containers(monkeypatch) -> None:
     adapter = DockerAdapter()
     calls: list[list[str]] = []
 
-    def fake_run(cmd: list[str], check: bool, capture_output: bool, text: bool) -> subprocess.CompletedProcess:
+    def fake_run(cmd: list[str], check: bool, capture_output: bool, text: bool, **kwargs) -> subprocess.CompletedProcess:
         calls.append(cmd)
         if cmd[:3] == ["docker", "ps", "-aq"]:
             return subprocess.CompletedProcess(cmd, 0, stdout="cid-1\ncid-2\n", stderr="")
@@ -77,7 +122,7 @@ def test_list_managed_container_refs_reads_sandbox_labels(monkeypatch) -> None:
     adapter = DockerAdapter()
     calls: list[list[str]] = []
 
-    def fake_run(cmd: list[str], check: bool, capture_output: bool, text: bool) -> subprocess.CompletedProcess:
+    def fake_run(cmd: list[str], check: bool, capture_output: bool, text: bool, **kwargs) -> subprocess.CompletedProcess:
         calls.append(cmd)
         if cmd[:3] == ["docker", "ps", "-aq"]:
             return subprocess.CompletedProcess(cmd, 0, stdout="cid-1\ncid-2\n", stderr="")

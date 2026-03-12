@@ -231,7 +231,8 @@ verge-browser/
 │   └── human_handoff.py         # 人机协作示例
 │
 ├── docker/
-│   └── runtime-image.Dockerfile
+│   ├── runtime-xvfb.Dockerfile
+│   └── runtime-xpra.Dockerfile
 │
 └── docs/
     ├── idea/

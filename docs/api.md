@@ -57,7 +57,8 @@ Request:
 ```json
 {
   "alias": "manual-test",
-  "image": "verge-browser-runtime:latest",
+  "kind": "xvfb_vnc",
+  "image": "verge-browser-runtime-xvfb:latest",
   "default_url": "https://example.com",
   "width": 1440,
   "height": 900,
@@ -69,8 +70,10 @@ Request:
 
 Response notes:
 
-- Creation and detail responses no longer expose `cdp_url` or `vnc_url`
+- Creation and detail responses no longer expose `cdp_url` or `session_url`
 - Browser runtime info is aggregated under `data.browser`
+- `kind` selects the runtime stack: `xvfb_vnc` or `xpra`
+- If `image` is omitted, the server picks the default image for the selected `kind`
 
 ### `GET /sandbox`
 
@@ -86,6 +89,7 @@ Example `data` payload:
 {
   "id": "sb_123",
   "alias": "manual-test",
+  "kind": "xvfb_vnc",
   "status": "RUNNING",
   "created_at": "2026-03-12T10:00:00Z",
   "updated_at": "2026-03-12T10:00:05Z",
@@ -139,6 +143,13 @@ Pause a sandbox.
 ### `POST /sandbox/{sandbox_id}/resume`
 
 Resume a stopped sandbox.
+
+### Sandbox Kinds
+
+- `xvfb_vnc`
+  Exposes a noVNC session behind the unified `/session/...` routes.
+- `xpra`
+  Exposes an Xpra HTML5 session behind the same `/session/...` routes.
 
 ### `POST /sandbox/{sandbox_id}/browser/restart`
 
@@ -230,11 +241,11 @@ Response `data`:
 
 Browser-level CDP proxy. Requires `ticket=...` in the query string.
 
-## VNC
+## Session
 
-### `POST /sandbox/{sandbox_id}/vnc/apply`
+### `POST /sandbox/{sandbox_id}/session/apply`
 
-Apply for a VNC access ticket and return a ticketed entry URL.
+Apply for an Xpra session access ticket and return a ticketed entry URL.
 
 Request:
 
@@ -250,24 +261,24 @@ Response `data`:
 ```json
 {
   "ticket": "<opaque-ticket>",
-  "vnc_url": "https://api.example.com/sandbox/sb_123/vnc/?ticket=hexpayload.signature",
+  "session_url": "https://api.example.com/sandbox/sb_123/session/?ticket=hexpayload.signature",
   "mode": "one_time",
   "ttl_sec": 60,
   "expires_at": "2026-03-12T12:34:56Z"
 }
 ```
 
-### `GET /sandbox/{sandbox_id}/vnc/?ticket=...`
+### `GET /sandbox/{sandbox_id}/session/?ticket=...`
 
-Validate the ticket, mint a short-lived VNC session, and redirect to noVNC.
+Validate the ticket, mint a short-lived sandbox session cookie, and return the proxied Xpra HTML5 entry page.
 
-### `GET /sandbox/{sandbox_id}/vnc/{asset_path}`
+### `GET /sandbox/{sandbox_id}/session/{asset_path}`
 
-Proxy noVNC static assets after session validation.
+Proxy Xpra HTML5 static assets after session validation.
 
-### `WS /sandbox/{sandbox_id}/vnc/websockify`
+### `WS /sandbox/{sandbox_id}/session/ws`
 
-Proxy the VNC WebSocket after session validation.
+Proxy the Xpra session WebSocket after session validation.
 
 ## Files
 

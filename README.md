@@ -63,8 +63,7 @@ Client / Agent / Human
         v
 +-----------------------------------------------+
 | Sandbox Runtime Container                     |
-| Xvfb + Openbox + Chromium + x11vnc            |
-| websockify + supervisor + /workspace          |
+| xvfb_vnc or xpra + Chromium + /workspace      |
 +-----------------------------------------------+
 ```
 
@@ -75,7 +74,7 @@ The repository currently implements:
 - sandbox create / get / pause / resume / delete flow with Docker-backed runtime startup
 - persisted workspace metadata and startup recovery for stopped sandboxes
 - browser info, viewport, screenshot, actions, restart, and CDP proxying
-- ticket-based VNC entry with noVNC asset proxying
+- ticket-based session entry with noVNC or Xpra asset proxying
 - workspace-scoped file list, read, write, upload, download, and delete operations
 - an admin web console that is built into static assets and served by the API at `/admin`
 - runtime Dockerfile, supervisor configuration, startup scripts, and Docker-backed integration coverage
@@ -86,9 +85,10 @@ The repository currently implements:
 apps/
   api-server/         FastAPI application
   admin-web/          Vite + React admin console, built into API static assets
-  sandbox-runtime/    Runtime scripts and supervisor config
+  runtime-xvfb/       Xvfb + VNC runtime assets
+  runtime-xpra/       Xpra runtime assets
 deployments/          Local deployment assets
-docker/               Runtime container build files
+docker/               Runtime and API container build files
 tests/                Unit tests
 ```
 
@@ -120,10 +120,11 @@ pnpm --dir apps/admin-web build
 
 This emits static files into `apps/api-server/app/static/admin`.
 
-**3. Build the runtime image**
+**3. Build the runtime images**
 
 ```bash
-docker build -f docker/runtime-image.Dockerfile -t verge-browser-runtime:latest .
+docker build -f docker/runtime-xvfb.Dockerfile -t verge-browser-runtime-xvfb:latest .
+docker build -f docker/runtime-xpra.Dockerfile -t verge-browser-runtime-xpra:latest .
 ```
 
 **4. Start the API server**
@@ -149,8 +150,9 @@ The dev server listens on [http://127.0.0.1:5173](http://127.0.0.1:5173) and pro
 Run the API server in Docker and let it manage runtime containers through the host Docker socket.
 
 ```bash
-# Build the runtime image (contains Chromium, VNC, etc.)
-docker build -f docker/runtime-image.Dockerfile -t verge-browser-runtime:latest .
+# Build both runtime images
+docker build -f docker/runtime-xvfb.Dockerfile -t verge-browser-runtime-xvfb:latest .
+docker build -f docker/runtime-xpra.Dockerfile -t verge-browser-runtime-xpra:latest .
 
 # Build the API server image (also builds and bundles the admin web)
 docker build -f docker/api-server.Dockerfile -t verge-browser-api:latest .
@@ -185,7 +187,7 @@ For convenience, use the provided compose file:
 
 ```bash
 export PROJECT_ROOT="$PWD"
-docker compose -f deployments/docker-compose.yml build api runtime-image
+docker compose -f deployments/docker-compose.yml build api
 docker compose -f deployments/docker-compose.yml up api
 ```
 
@@ -247,7 +249,8 @@ PYTHONPATH=apps/api-server pytest
 Run the expected local validation flow for runtime-backed changes:
 
 ```bash
-docker build -f docker/runtime-image.Dockerfile -t verge-browser-runtime:latest .
+docker build -f docker/runtime-xvfb.Dockerfile -t verge-browser-runtime-xvfb:latest .
+docker build -f docker/runtime-xpra.Dockerfile -t verge-browser-runtime-xpra:latest .
 PYTHONPATH=apps/api-server pytest tests/unit tests/integration/test_runtime_api.py
 ```
 
@@ -259,8 +262,8 @@ Common flows:
 
 - `tests/scripts/create-sandbox.sh`
   Creates a sandbox and prints the IDs and follow-up URLs you need.
-- `tests/scripts/get-vnc-url.sh`
-  Always creates a fresh sandbox and prints a browser-ready noVNC URL that you can open directly.
+- `tests/scripts/get-session-url.sh`
+  Always creates a fresh sandbox and prints a browser-ready session URL that you can open directly.
 - `tests/scripts/browser-smoke.sh`
   Saves browser metadata plus window and page screenshots under `tests/scripts/.artifacts/`.
 - `tests/scripts/restart-browser.sh`
@@ -302,6 +305,13 @@ The runtime image hosts:
 
 It also includes a small TCP relay so the platform can expose a stable CDP entrypoint even though Chromium itself listens on the internal debugging port.
 
+Two runtime variants are supported:
+
+- `xvfb_vnc`
+  Xvfb + x11vnc + noVNC / websockify
+- `xpra`
+  Xpra HTML5 session
+
 ## API Surface
 
 The API follows the `/sandboxes/{sandbox_id}/...` routing model from [`docs/tech.md`](./docs/tech.md).
@@ -316,7 +326,7 @@ Verge Browser focuses purely on browser control:
 - Browser lifecycle (create, pause, resume, delete)
 - Browser automation via CDP
 - GUI screenshots and input actions
-- VNC human takeover
+- Session-based human takeover (`xvfb_vnc` or `xpra`)
 - File system for sharing data with the browser
 
 Arbitrary command execution is intentionally excluded to keep the surface area minimal and the focus sharp.

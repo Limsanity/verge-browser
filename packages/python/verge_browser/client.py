@@ -43,13 +43,14 @@ class VergeClient:
         self,
         *,
         alias: str | None = None,
+        kind: str = "xvfb_vnc",
         width: int = 1280,
         height: int = 1024,
         default_url: str | None = None,
         image: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        payload: dict[str, Any] = {"width": width, "height": height, "metadata": metadata or {}}
+        payload: dict[str, Any] = {"kind": kind, "width": width, "height": height, "metadata": metadata or {}}
         if alias is not None:
             payload["alias"] = alias
         if default_url is not None:
@@ -94,7 +95,7 @@ class VergeClient:
             payload["ttl_sec"] = ttl_sec
         return self._request("POST", f"/sandbox/{quote(id_or_alias, safe='')}/cdp/apply", json=payload)
 
-    def create_vnc_ticket(
+    def create_session_ticket(
         self,
         id_or_alias: str,
         *,
@@ -104,9 +105,9 @@ class VergeClient:
         payload: dict[str, Any] = {"mode": mode}
         if ttl_sec is not None:
             payload["ttl_sec"] = ttl_sec
-        return self._request("POST", f"/sandbox/{quote(id_or_alias, safe='')}/vnc/apply", json=payload)
+        return self._request("POST", f"/sandbox/{quote(id_or_alias, safe='')}/session/apply", json=payload)
 
-    def get_vnc_url(
+    def get_session_url(
         self,
         id_or_alias: str,
         *,
@@ -114,12 +115,12 @@ class VergeClient:
         ttl_sec: int | None = None,
     ) -> dict[str, Any]:
         sandbox = self.get_sandbox(id_or_alias)
-        ticket = self.create_vnc_ticket(str(sandbox["id"]), mode=mode, ttl_sec=ttl_sec)
+        ticket = self.create_session_ticket(str(sandbox["id"]), mode=mode, ttl_sec=ttl_sec)
         return {
             "sandbox_id": sandbox["id"],
             "alias": sandbox.get("alias"),
             "ticket": ticket["ticket"],
-            "url": ticket["vnc_url"],
+            "url": ticket["session_url"],
             "expires_at": ticket.get("expires_at"),
             "mode": ticket["mode"],
             "ttl_sec": ticket.get("ttl_sec"),

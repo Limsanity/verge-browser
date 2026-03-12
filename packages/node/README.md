@@ -7,7 +7,7 @@ Node.js SDK and CLI for [Verge Browser](https://github.com/zzzgydi/verge-browser
 - **TypeScript-first**: Full type definitions included
 - **SDK + CLI**: Use programmatically or from command line
 - **ESM-native**: Modern ES module support
-- **Control plane coverage**: Sandbox lifecycle, browser controls, VNC/CDP, and files APIs
+- **Control plane coverage**: Sandbox lifecycle, browser controls, session/CDP, and files APIs
 - **Lightweight**: Minimal runtime dependency surface (CLI uses `cac`)
 
 ## Installation
@@ -36,9 +36,9 @@ const sandbox = await client.createSandbox({
   height: 720,
 });
 
-// Get VNC URL
-const vnc = await client.getVncUrl(sandbox.id);
-console.log(vnc.url);
+// Get session URL
+const session = await client.getSessionUrl(sandbox.id);
+console.log(session.url);
 
 // Get CDP info
 const cdp = await client.getCdpInfo(sandbox.id);
@@ -125,8 +125,8 @@ verge-browser sandbox get shopping
 # Get CDP info
 verge-browser sandbox cdp shopping --json
 
-# Get VNC URL
-verge-browser sandbox vnc shopping --json
+# Get session URL
+verge-browser sandbox session shopping --json
 
 # Restart Chromium inside a sandbox
 verge-browser sandbox restart shopping --json
@@ -200,8 +200,8 @@ new VergeClient(options?: VergeClientOptions)
 | `getBrowserScreenshot(idOrAlias, options?)` | Capture a window or page screenshot |
 | `executeBrowserActions(idOrAlias, payload)` | Execute GUI actions via `xdotool` |
 | `getCdpInfo(idOrAlias)` | Get Chrome DevTools Protocol info |
-| `createVncTicket(idOrAlias, options?)` | Create a VNC access ticket |
-| `getVncUrl(idOrAlias)` | Get VNC URL with ticket |
+| `createSessionTicket(idOrAlias, options?)` | Create a session access ticket |
+| `getSessionUrl(idOrAlias)` | Get session URL with ticket |
 | `listFiles(idOrAlias, path?)` | List sandbox files |
 | `readFile(idOrAlias, path)` | Read a UTF-8 text file |
 | `writeFile(idOrAlias, payload)` | Write a UTF-8 text file |

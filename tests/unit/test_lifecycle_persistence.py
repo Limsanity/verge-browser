@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from app.models.sandbox import RuntimeEndpoint, SandboxRecord, SandboxStatus
+from app.models.sandbox import RuntimeEndpoint, SandboxKind, SandboxRecord, SandboxStatus
 from app.services.lifecycle import SandboxLifecycleService
 from app.services.registry import registry
 
@@ -24,6 +24,7 @@ def _sandbox(root: Path, *, status: SandboxStatus = SandboxStatus.RUNNING) -> Sa
         path.mkdir(parents=True, exist_ok=True)
     return SandboxRecord(
         id="sb_test",
+        kind=SandboxKind.XVFB_VNC,
         status=status,
         width=1280,
         height=1024,
@@ -70,10 +71,11 @@ async def test_resume_recreates_container_for_stopped_sandbox(tmp_path: Path, mo
     def fake_is_available() -> bool:
         return True
 
-    def fake_create_container(*, sandbox_id: str, workspace_dir: Path, width: int, height: int, default_url: str | None, image: str | None) -> tuple[str | None, str]:
+    def fake_create_container(*, sandbox_id: str, kind: SandboxKind, workspace_dir: Path, width: int, height: int, default_url: str | None, image: str | None) -> tuple[str | None, str]:
         create_calls.append(
             {
                 "sandbox_id": sandbox_id,
+                "kind": kind,
                 "workspace_dir": workspace_dir,
                 "width": width,
                 "height": height,
@@ -99,6 +101,7 @@ async def test_resume_recreates_container_for_stopped_sandbox(tmp_path: Path, mo
     assert create_calls == [
         {
             "sandbox_id": "sb_test",
+            "kind": SandboxKind.XVFB_VNC,
             "workspace_dir": sandbox.workspace_dir,
             "width": 1280,
             "height": 1024,

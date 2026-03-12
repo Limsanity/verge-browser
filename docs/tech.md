@@ -6,7 +6,7 @@
 
 - Chromium GUI 浏览器运行环境
 - CDP（Chrome DevTools Protocol）程序化控制能力
-- VNC / noVNC 人工接管能力
+- Session 人工接管能力（支持 `xvfb_vnc` 与 `xpra` 两种 runtime）
 - GUI 级截图与鼠标键盘动作注入能力
 - 共享文件系统
 - 面向 Agent 的统一 REST / WebSocket / MCP 接口
@@ -29,7 +29,7 @@
 1. 创建隔离的 sandbox 会话。
 2. 在 sandbox 内启动可视化 Chromium 浏览器。
 3. 通过 CDP 暴露 Playwright / Puppeteer 可连接的控制接口。
-4. 通过 noVNC 暴露人工接管界面。
+4. 通过统一 `session_url` 暴露人工接管界面，底层可由 noVNC 或 Xpra HTML5 承载。
 5. 提供浏览器窗口级截图接口。
 6. 提供 GUI 动作注入接口（移动、点击、滚动、输入、热键、等待）。
 7. 提供统一共享工作目录 `/workspace`。
@@ -56,7 +56,14 @@ V1 不强制实现以下能力：
 
 ### 3.1 单容器单会话
 
-V1 采用“一容器一会话一浏览器”模型。每个 sandbox 对应一个容器实例，容器内运行浏览器、VNC、API 代理等所有组件。
+V1 采用“一容器一会话一浏览器”模型。每个 sandbox 对应一个容器实例，容器内运行浏览器、session runtime、API 代理等所有组件。
+
+当前实现约束补充：
+
+- sandbox 必须显式具备 `kind`
+- `kind=xvfb_vnc` 表示 Xvfb + x11vnc + noVNC / websockify
+- `kind=xpra` 表示 Xpra HTML5 session
+- 两种 runtime 对外统一走 `/sandbox/{sandbox_id}/session/...`
 
 好处：
 
@@ -275,7 +282,8 @@ browser-sandbox/
       jwt.py
       tickets.py
   docker/
-    runtime-image.Dockerfile
+    runtime-xvfb.Dockerfile
+    runtime-xpra.Dockerfile
   deployments/
     docker-compose.yml
     caddy/

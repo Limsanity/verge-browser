@@ -15,8 +15,8 @@ Verge Browser is a browser sandbox system for agent workflows. The current repos
 ## Repository Conventions
 
 - API code lives in `apps/api-server/app`.
-- Runtime scripts live in `apps/sandbox-runtime/scripts`.
-- Supervisor wiring lives in `apps/sandbox-runtime/supervisor`.
+- Runtime scripts live in `apps/runtime-xvfb/scripts` and `apps/runtime-xpra/scripts`.
+- Supervisor wiring lives in `apps/runtime-xvfb/supervisor` and `apps/runtime-xpra/supervisor`.
 - Integration tests that require Docker live under `tests/integration`.
 - Use **Conventional Commits** for all `git commit` messages.
 - Do not leak local developer information in generated code or `git commit` messages, including machine-specific paths, usernames, home directories, or other local environment details.
@@ -40,7 +40,8 @@ uvicorn app.main:app --app-dir apps/api-server --host 0.0.0.0 --port 8000 --relo
 ### Build the runtime image
 
 ```bash
-docker build -f docker/runtime-image.Dockerfile -t verge-browser-runtime:latest .
+docker build -f docker/runtime-xvfb.Dockerfile -t verge-browser-runtime-xvfb:latest .
+docker build -f docker/runtime-xpra.Dockerfile -t verge-browser-runtime-xpra:latest .
 ```
 
 ### Run tests
@@ -62,4 +63,4 @@ PYTHONPATH=apps/api-server pytest -m integration tests/integration/test_runtime_
 - Keep README in sync with what is actually validated.
 - Add or extend integration tests whenever runtime behavior changes.
 - If you change runtime ports, update both the Docker image and the API-side runtime metadata.
-- If you change screenshot or VNC behavior, validate against a real built runtime image before considering the change done.
+- If you change screenshot or session behavior, validate against a real built runtime image before considering the change done.

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.config import get_settings
+from app.models.sandbox import SandboxKind
 
 
 @dataclass(frozen=True)
@@ -21,16 +22,44 @@ class DockerAdapter:
 
     def is_available(self) -> bool:
         try:
-            proc = subprocess.run(["docker", "info"], check=False, capture_output=True, text=True)
+            proc = subprocess.run(["docker", "info"], check=False, capture_output=True, text=True, timeout=5)
         except FileNotFoundError:
+            return False
+        except subprocess.TimeoutExpired:
             return False
         return proc.returncode == 0
 
-    def create_container(self, *, sandbox_id: str, workspace_dir: Path, width: int, height: int, default_url: str | None, image: str | None) -> tuple[str | None, str]:
+    def image_exists(self, image_name: str) -> bool:
+        try:
+            proc = subprocess.run(
+                ["docker", "image", "inspect", image_name],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            return False
+        return proc.returncode == 0
+
+    def create_container(
+        self,
+        *,
+        sandbox_id: str,
+        kind: SandboxKind,
+        workspace_dir: Path,
+        width: int,
+        height: int,
+        default_url: str | None,
+        image: str | None,
+    ) -> tuple[str | None, str]:
         settings = get_settings()
-        image_name = image or settings.sandbox_runtime_image
-        xvfb_whd = f"{width}x{height}x24"
+        image_name = image or settings.runtime_image_for_kind(kind)
+        if not self.image_exists(image_name):
+            return None, "127.0.0.1"
         container_name = f"verge-sandbox-{sandbox_id}"
+        display = settings.display_for_kind(kind)
+        session_port = settings.session_port_for_kind(kind)
         cmd = [
             "docker",
             "run",
@@ -47,7 +76,7 @@ class DockerAdapter:
             "-e",
             f"SANDBOX_ID={sandbox_id}",
             "-e",
-            f"XVFB_WHD={xvfb_whd}",
+            f"DISPLAY={display}",
             "-e",
             f"BROWSER_WINDOW_WIDTH={width}",
             "-e",
@@ -58,6 +87,10 @@ class DockerAdapter:
             f"{workspace_dir}:/workspace",
             image_name,
         ]
+        if kind == SandboxKind.XPRA:
+            cmd.extend(["-e", f"XPRA_DISPLAY={display}", "-e", f"XPRA_PORT={session_port}"])
+        else:
+            cmd.extend(["-e", f"XVFB_WHD={width}x{height}x24", "-e", f"WEBSOCKET_PROXY_PORT={session_port}"])
         try:
             proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
         except (FileNotFoundError, subprocess.CalledProcessError):

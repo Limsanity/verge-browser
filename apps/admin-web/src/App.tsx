@@ -21,6 +21,7 @@ function GitHubIcon({ className }: { className?: string }) {
 type Sandbox = {
   id: string;
   alias: string | null;
+  kind: "xvfb_vnc" | "xpra";
   status: string;
   created_at: string;
   updated_at: string;
@@ -73,12 +74,21 @@ async function api<T>(
       message?: string;
       detail?: string;
     } | null;
-    const message = payload?.message || payload?.detail || `Request failed with ${response.status}`;
+    const message =
+      payload?.message ||
+      payload?.detail ||
+      `Request failed with ${response.status}`;
     toast.error(message);
     throw new Error(message);
   }
   const payload = (await response.json()) as ApiEnvelope<T> | T;
-  if (payload && typeof payload === "object" && "code" in payload && "message" in payload && "data" in payload) {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "code" in payload &&
+    "message" in payload &&
+    "data" in payload
+  ) {
     return payload.data;
   }
   return payload as T;
@@ -132,6 +142,7 @@ export function App() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [createAlias, setCreateAlias] = useState("");
+  const [createKind, setCreateKind] = useState<"xvfb_vnc" | "xpra">("xvfb_vnc");
   const [isActionLoading, setIsActionLoading] = useState(false);
 
   const {
@@ -156,6 +167,7 @@ export function App() {
         method: "POST",
         body: JSON.stringify({
           alias: createAlias || undefined,
+          kind: createKind,
           width: 1280,
           height: 1024,
         }),
@@ -163,7 +175,9 @@ export function App() {
       setCreateAlias("");
       await refresh();
       setSelectedId(detail.id);
-      toast.success(`Sandbox ${detail.alias || detail.id.slice(0, 8)} created successfully`);
+      toast.success(
+        `Sandbox ${detail.alias || detail.id.slice(0, 8)} created successfully`,
+      );
     } catch {
       // Error is already toasted by api()
     } finally {
@@ -172,7 +186,7 @@ export function App() {
   }
 
   async function runAction(
-    action: "pause" | "resume" | "delete" | "vnc" | "cdp",
+    action: "pause" | "resume" | "delete" | "session" | "cdp",
     sandbox: Sandbox,
   ) {
     setIsActionLoading(true);
@@ -181,17 +195,17 @@ export function App() {
         await api(`/sandbox/${sandbox.id}`, token, { method: "DELETE" });
         setSelectedId(null);
         toast.success("Sandbox deleted successfully");
-      } else if (action === "vnc") {
-        const ticket = await api<{ ticket: string; vnc_url: string }>(
-          `/sandbox/${sandbox.id}/vnc/apply`,
+      } else if (action === "session") {
+        const ticket = await api<{ ticket: string; session_url: string }>(
+          `/sandbox/${sandbox.id}/session/apply`,
           token,
           {
             method: "POST",
-            body: JSON.stringify({ mode: "one_time" }),
+            body: JSON.stringify({ mode: "permanent" }),
           },
         );
-        window.open(ticket.vnc_url, "_blank", "noopener,noreferrer");
-        toast.success("VNC session opened");
+        window.open(ticket.session_url, "_blank", "noopener,noreferrer");
+        toast.success("Session opened");
       } else if (action === "cdp") {
         const ticket = await api<{ ticket: string; cdp_url: string }>(
           `/sandbox/${sandbox.id}/cdp/apply`,
@@ -268,13 +282,22 @@ export function App() {
           </p>
           <h1>Sandbox Control</h1>
         </div>
-        <div className="toolbar-actions">
-          <input
-            value={createAlias}
-            onChange={(event) => setCreateAlias(event.target.value)}
-            placeholder="alias (optional)"
-          />
-          <button
+              <div className="toolbar-actions">
+                <input
+                  value={createAlias}
+                  onChange={(event) => setCreateAlias(event.target.value)}
+                  placeholder="alias (optional)"
+                />
+                <select
+                  value={createKind}
+                  onChange={(event) =>
+                    setCreateKind(event.target.value as "xvfb_vnc" | "xpra")
+                  }
+                >
+                  <option value="xvfb_vnc">xvfb + vnc</option>
+                  <option value="xpra">xpra</option>
+                </select>
+                <button
             className="create-btn"
             onClick={() => void createSandbox()}
             disabled={isActionLoading}
@@ -343,8 +366,12 @@ export function App() {
               </div>
 
               <div className="detail-grid">
-                <div>
-                  <label>Viewport</label>
+                    <div>
+                      <label>Kind</label>
+                      <p>{selected.kind}</p>
+                    </div>
+                    <div>
+                      <label>Viewport</label>
                   <p>
                     {selected.width} x {selected.height}
                   </p>
@@ -373,10 +400,10 @@ export function App() {
                   Resume
                 </button>
                 <button
-                  onClick={() => void runAction("vnc", selected)}
+                  onClick={() => void runAction("session", selected)}
                   disabled={isActionLoading}
                 >
-                  Open VNC
+                  Open Session
                 </button>
                 <button
                   onClick={() => void runAction("cdp", selected)}

@@ -7,9 +7,9 @@ def main() -> None:
     cdp = client.get_cdp_info(sandbox["id"])
     print("CDP:", cdp["cdp_url"])
 
-    vnc = client.get_vnc_url(sandbox["id"])
+    session = client.get_session_url(sandbox["id"])
     print("Send this URL to the human operator:")
-    print(vnc["url"])
+    print(session["url"])
 
     refreshed = client.get_sandbox(sandbox["id"])
     print("Current status:", refreshed["status"])

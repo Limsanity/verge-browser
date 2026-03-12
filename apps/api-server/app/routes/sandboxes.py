@@ -17,6 +17,7 @@ def _to_response(request: Request, sandbox, subject: str) -> SandboxResponse:
     return SandboxResponse(
         id=sandbox.id,
         alias=sandbox.alias,
+        kind=sandbox.kind,
         status=sandbox.status,
         created_at=sandbox.created_at,
         updated_at=sandbox.updated_at,

@@ -12,8 +12,8 @@ from app.config import get_settings
 from app.routes.browser import router as browser_router
 from app.routes.files import router as files_router
 from app.routes.health import router as health_router
+from app.routes.session import router as session_router
 from app.routes.sandboxes import router as sandbox_router
-from app.routes.vnc import router as vnc_router
 from app.services.docker_adapter import docker_adapter
 from app.services.registry import registry
 from app.models.sandbox import SandboxStatus
@@ -122,7 +122,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(sandbox_router)
     app.include_router(browser_router)
-    app.include_router(vnc_router)
+    app.include_router(session_router)
     app.include_router(files_router)
     return app
 

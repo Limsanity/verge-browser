@@ -5,7 +5,18 @@ from collections.abc import Iterable
 from pathlib import Path
 from threading import Lock
 
-from app.models.sandbox import RuntimeEndpoint, SandboxRecord, SandboxStatus
+from app.models.sandbox import SandboxKind, RuntimeEndpoint, SandboxRecord, SandboxStatus
+
+
+def _kind_from_payload(payload: dict, runtime_payload: dict) -> SandboxKind:
+    kind = payload.get("kind")
+    if kind in {SandboxKind.XPRA.value, SandboxKind.XPRA}:
+        return SandboxKind.XPRA
+    if kind in {SandboxKind.XVFB_VNC.value, SandboxKind.XVFB_VNC}:
+        return SandboxKind.XVFB_VNC
+    if runtime_payload.get("session_port") == 14500 or runtime_payload.get("display") == ":100":
+        return SandboxKind.XPRA
+    return SandboxKind.XVFB_VNC
 
 
 class SandboxRegistry:
@@ -54,9 +65,11 @@ class SandboxRegistry:
                     payload = json.loads(meta_file.read_text())
                     workspace_dir = sandbox_dir / workspace_subdir
                     runtime_payload = payload.get("runtime") or {}
+                    kind = _kind_from_payload(payload, runtime_payload)
                     sandbox = SandboxRecord(
                         id=payload["id"],
                         alias=payload.get("alias"),
+                        kind=kind,
                         status=SandboxStatus.STOPPED,
                         created_at=payload["created_at"],
                         updated_at=payload["updated_at"],
@@ -70,10 +83,11 @@ class SandboxRegistry:
                         browser_profile_dir=workspace_dir / browser_profile_subdir,
                         container_id=None,
                         runtime=RuntimeEndpoint(
+                            host="127.0.0.1",
                             cdp_port=runtime_payload.get("cdp_port", 9223),
-                            vnc_port=runtime_payload.get("vnc_port", 6080),
-                            display=runtime_payload.get("display", ":99"),
-                            browser_port=runtime_payload.get("browser_port", 5900),
+                            session_port=runtime_payload.get("session_port", runtime_payload.get("vnc_port", 14500)),
+                            display=runtime_payload.get("display", ":100"),
+                            browser_debug_port=runtime_payload.get("browser_debug_port", runtime_payload.get("browser_port", 9222)),
                         ),
                         metadata=payload.get("metadata", {}),
                     )
@@ -91,6 +105,7 @@ class SandboxRegistry:
         payload = {
             "id": sandbox.id,
             "alias": sandbox.alias,
+            "kind": sandbox.kind,
             "created_at": sandbox.created_at.isoformat(),
             "updated_at": sandbox.updated_at.isoformat(),
             "last_active_at": sandbox.last_active_at.isoformat(),

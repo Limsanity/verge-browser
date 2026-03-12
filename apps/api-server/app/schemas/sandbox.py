@@ -3,11 +3,12 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from app.models.sandbox import SandboxStatus
+from app.models.sandbox import SandboxKind, SandboxStatus
 
 
 class CreateSandboxRequest(BaseModel):
     alias: str | None = Field(default=None, min_length=1, max_length=63)
+    kind: SandboxKind = SandboxKind.XVFB_VNC
     image: str | None = None
     default_url: str | None = None
     width: int = Field(default=1280, ge=320, le=7680)
@@ -52,6 +53,7 @@ class BrowserRuntimeInfo(BaseModel):
 class SandboxResponse(BaseModel):
     id: str
     alias: str | None = None
+    kind: SandboxKind
     status: SandboxStatus
     created_at: datetime
     updated_at: datetime
@@ -67,14 +69,14 @@ class RestartBrowserRequest(BaseModel):
     level: Literal["hard"] = "hard"
 
 
-class CreateVncTicketRequest(BaseModel):
+class CreateSessionTicketRequest(BaseModel):
     mode: Literal["one_time", "reusable", "permanent"] = "one_time"
     ttl_sec: int | None = Field(default=None, ge=1, le=86400)
 
 
-class CreateVncTicketResponse(BaseModel):
+class CreateSessionTicketResponse(BaseModel):
     ticket: str
-    vnc_url: str
+    session_url: str
     mode: Literal["one_time", "reusable", "permanent"]
     ttl_sec: int | None
     expires_at: datetime | None

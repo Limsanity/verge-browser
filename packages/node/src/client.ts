@@ -11,7 +11,8 @@ export type JsonPrimitive = boolean | number | string | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 export type JsonObject = { [key: string]: JsonValue };
 export type SandboxStatus = 'STARTING' | 'RUNNING' | 'STOPPED' | 'FAILED' | 'DEGRADED';
-export type VncTicketMode = 'one_time' | 'reusable' | 'permanent';
+export type SandboxKind = 'xvfb_vnc' | 'xpra';
+export type AccessTicketMode = 'one_time' | 'reusable' | 'permanent';
 export type ScreenshotFormat = 'png' | 'jpeg' | 'webp';
 export type ScreenshotType = 'window' | 'page';
 export type MouseButton = 'left' | 'middle' | 'right';
@@ -47,6 +48,7 @@ export interface BrowserInfo {
 export interface SandboxResponse {
   id: string;
   alias?: string | null;
+  kind: SandboxKind;
   status: SandboxStatus;
   created_at: string;
   updated_at: string;
@@ -58,10 +60,10 @@ export interface SandboxResponse {
   container_id?: string | null;
 }
 
-export interface VncTicketResponse {
+export interface SessionTicketResponse {
   ticket: string;
-  vnc_url: string;
-  mode: VncTicketMode;
+  session_url: string;
+  mode: AccessTicketMode;
   ttl_sec: number | null;
   expires_at: string | null;
 }
@@ -69,13 +71,14 @@ export interface VncTicketResponse {
 export interface CdpInfoResponse {
   ticket: string;
   cdp_url: string;
-  mode: VncTicketMode;
+  mode: AccessTicketMode;
   ttl_sec: number | null;
   expires_at: string | null;
 }
 
 export interface CreateSandboxPayload {
   alias?: string;
+  kind?: SandboxKind;
   width?: number;
   height?: number;
   default_url?: string;
@@ -110,13 +113,13 @@ export interface VergeClientOptions {
   fetchImpl?: FetchLike;
 }
 
-export interface VncUrlResponse {
+export interface SessionUrlResponse {
   sandbox_id: string;
   alias?: string | null;
   ticket: string;
   url: string;
   expires_at: string | null;
-  mode: VncTicketMode;
+  mode: AccessTicketMode;
   ttl_sec: number | null;
 }
 
@@ -273,7 +276,12 @@ export class VergeClient {
   }
 
   createSandbox(payload: CreateSandboxPayload = {}): Promise<SandboxResponse> {
-    return this.requestJson<SandboxResponse>('POST', '/sandbox', { body: payload });
+    return this.requestJson<SandboxResponse>('POST', '/sandbox', {
+      body: {
+        kind: payload.kind ?? 'xvfb_vnc',
+        ...payload,
+      },
+    });
   }
 
   getSandbox(idOrAlias: string): Promise<SandboxResponse> {
@@ -333,7 +341,7 @@ export class VergeClient {
     return this.requestJson<BrowserActionsResponse>('POST', `/sandbox/${encodeURIComponent(idOrAlias)}/browser/actions`, { body: payload });
   }
 
-  getCdpInfo(idOrAlias: string, payload: { mode?: VncTicketMode; ttl_sec?: number } = {}): Promise<CdpInfoResponse> {
+  getCdpInfo(idOrAlias: string, payload: { mode?: AccessTicketMode; ttl_sec?: number } = {}): Promise<CdpInfoResponse> {
     return this.requestJson<CdpInfoResponse>('POST', `/sandbox/${encodeURIComponent(idOrAlias)}/cdp/apply`, {
       body: {
         mode: payload.mode ?? 'reusable',
@@ -342,8 +350,8 @@ export class VergeClient {
     });
   }
 
-  createVncTicket(idOrAlias: string, payload: { mode?: VncTicketMode; ttl_sec?: number } = {}): Promise<VncTicketResponse> {
-    return this.requestJson<VncTicketResponse>('POST', `/sandbox/${encodeURIComponent(idOrAlias)}/vnc/apply`, {
+  createSessionTicket(idOrAlias: string, payload: { mode?: AccessTicketMode; ttl_sec?: number } = {}): Promise<SessionTicketResponse> {
+    return this.requestJson<SessionTicketResponse>('POST', `/sandbox/${encodeURIComponent(idOrAlias)}/session/apply`, {
       body: {
         mode: payload.mode ?? 'one_time',
         ...(payload.ttl_sec !== undefined ? { ttl_sec: payload.ttl_sec } : {}),
@@ -351,14 +359,14 @@ export class VergeClient {
     });
   }
 
-  async getVncUrl(idOrAlias: string): Promise<VncUrlResponse> {
+  async getSessionUrl(idOrAlias: string): Promise<SessionUrlResponse> {
     const sandbox = await this.getSandbox(idOrAlias);
-    const ticket = await this.createVncTicket(String(sandbox.id), { mode: 'one_time' });
+    const ticket = await this.createSessionTicket(String(sandbox.id), { mode: 'one_time' });
     return {
       sandbox_id: sandbox.id,
       ...(sandbox.alias !== undefined ? { alias: sandbox.alias } : {}),
       ticket: ticket.ticket,
-      url: ticket.vnc_url,
+      url: ticket.session_url,
       expires_at: ticket.expires_at,
       mode: ticket.mode,
       ttl_sec: ticket.ttl_sec,

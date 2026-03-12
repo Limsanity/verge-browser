@@ -8,7 +8,7 @@ import pytest
 
 from app.config import get_settings
 from app.main import app
-from app.models.sandbox import RuntimeEndpoint, SandboxRecord, SandboxStatus
+from app.models.sandbox import RuntimeEndpoint, SandboxKind, SandboxRecord, SandboxStatus
 from app.services.docker_adapter import ManagedContainer
 from app.services.registry import SandboxRegistry, registry
 
@@ -36,6 +36,7 @@ def test_registry_persists_metadata_and_recovers_stopped_sandbox(tmp_path: Path)
     sandbox = SandboxRecord(
         id="sb_saved",
         alias="saved",
+        kind=SandboxKind.XVFB_VNC,
         status=SandboxStatus.RUNNING,
         created_at="2026-03-11T00:00:00+00:00",
         updated_at="2026-03-11T01:00:00+00:00",
@@ -59,6 +60,7 @@ def test_registry_persists_metadata_and_recovers_stopped_sandbox(tmp_path: Path)
     payload = json.loads(meta_file.read_text())
     assert "workspace_dir" not in payload
     assert payload["alias"] == "saved"
+    assert payload["kind"] == "xvfb_vnc"
     assert payload["image"] == "custom-runtime:1"
 
     restored = SandboxRegistry()
@@ -75,6 +77,7 @@ def test_registry_persists_metadata_and_recovers_stopped_sandbox(tmp_path: Path)
     assert recovered.status == SandboxStatus.STOPPED
     assert recovered.container_id is None
     assert recovered.alias == "saved"
+    assert recovered.kind == SandboxKind.XVFB_VNC
     assert recovered.image == "custom-runtime:1"
     assert recovered.workspace_dir == workspace_dir
     assert recovered.downloads_dir == workspace_dir / "downloads"
@@ -93,11 +96,12 @@ def test_app_startup_recovers_sandbox_from_disk(tmp_path: Path, monkeypatch: pyt
                 "created_at": "2026-03-11T00:00:00+00:00",
                 "updated_at": "2026-03-11T00:05:00+00:00",
                 "last_active_at": "2026-03-11T00:05:00+00:00",
+                "kind": "xpra",
                 "status": "RUNNING",
                 "width": 1280,
                 "height": 720,
                 "image": None,
-                "runtime": {"host": "10.0.0.8", "cdp_port": 9223, "vnc_port": 6080, "display": ":99", "browser_port": 5900},
+                "runtime": {"host": "10.0.0.8", "cdp_port": 9223, "session_port": 14500, "display": ":100", "browser_debug_port": 9222},
                 "metadata": {"restored": "yes"},
             }
         )
@@ -126,11 +130,12 @@ def test_app_startup_reconciles_running_runtime_container(tmp_path: Path, monkey
                 "created_at": "2026-03-11T00:00:00+00:00",
                 "updated_at": "2026-03-11T00:05:00+00:00",
                 "last_active_at": "2026-03-11T00:05:00+00:00",
+                "kind": "xpra",
                 "status": "RUNNING",
                 "width": 1280,
                 "height": 720,
                 "image": None,
-                "runtime": {"host": "10.0.0.8", "cdp_port": 9223, "vnc_port": 6080, "display": ":99", "browser_port": 5900},
+                "runtime": {"host": "10.0.0.8", "cdp_port": 9223, "session_port": 14500, "display": ":100", "browser_debug_port": 9222},
                 "metadata": {"runtime_error": "stale"},
             }
         )
@@ -180,11 +185,12 @@ def test_app_startup_removes_orphaned_and_stale_runtime_containers(tmp_path: Pat
                 "created_at": "2026-03-11T00:00:00+00:00",
                 "updated_at": "2026-03-11T00:05:00+00:00",
                 "last_active_at": "2026-03-11T00:05:00+00:00",
+                "kind": "xvfb_vnc",
                 "status": "RUNNING",
                 "width": 1280,
                 "height": 720,
                 "image": None,
-                "runtime": {"host": "10.0.0.8", "cdp_port": 9223, "vnc_port": 6080, "display": ":99", "browser_port": 5900},
+                "runtime": {"host": "10.0.0.8", "cdp_port": 9223, "session_port": 14500, "display": ":100", "browser_debug_port": 9222},
                 "metadata": {},
             }
         )

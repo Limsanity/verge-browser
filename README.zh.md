@@ -63,8 +63,7 @@ Verge Browser 旨在通过一种运行时模型来弥合这一差距，该模型
         v
 +-----------------------------------------------+
 | 沙箱运行时容器                                |
-| Xvfb + Openbox + Chromium + x11vnc            |
-| websockify + supervisor + /workspace          |
+| xvfb_vnc 或 xpra + Chromium + /workspace      |
 +-----------------------------------------------+
 ```
 
@@ -75,7 +74,7 @@ Verge Browser 旨在通过一种运行时模型来弥合这一差距，该模型
 - 基于 Docker 运行时启动的沙箱创建/获取/暂停/恢复/删除流程
 - 工作目录元数据持久化，以及停止态沙箱的启动恢复
 - 浏览器信息、视口、截图、操作、重启和 CDP 代理
-- 基于票据的 VNC 入口，支持 noVNC 资源代理
+- 基于票据的统一 session 入口，可下发 noVNC 或 Xpra 页面
 - 工作空间范围的文件列表、读取、写入、上传、下载和删除操作
 - 管理页会被构建为静态资源，并由 API 在 `/admin` 路径下提供
 - 运行时 Dockerfile、supervisor 配置、启动脚本和基于 Docker 的集成测试
@@ -86,9 +85,10 @@ Verge Browser 旨在通过一种运行时模型来弥合这一差距，该模型
 apps/
   api-server/         FastAPI 应用程序
   admin-web/          Vite + React 管理页，构建后进入 API 静态资源目录
-  sandbox-runtime/    运行时脚本和 supervisor 配置
+  runtime-xvfb/       Xvfb + VNC 运行时资源
+  runtime-xpra/       Xpra 运行时资源
 deployments/          本地部署资源
-docker/               运行时容器构建文件
+docker/               运行时与 API 容器构建文件
 tests/                单元测试
 ```
 
@@ -123,7 +123,8 @@ pnpm --dir apps/admin-web build
 **3. 构建运行时镜像**
 
 ```bash
-docker build -f docker/runtime-image.Dockerfile -t verge-browser-runtime:latest .
+docker build -f docker/runtime-xvfb.Dockerfile -t verge-browser-runtime-xvfb:latest .
+docker build -f docker/runtime-xpra.Dockerfile -t verge-browser-runtime-xpra:latest .
 ```
 
 **4. 启动 API 服务器**
@@ -149,8 +150,9 @@ pnpm --dir apps/admin-web dev
 在 Docker 中运行 API 服务，并通过宿主机 Docker socket 管理运行时容器。
 
 ```bash
-# 构建运行时镜像（包含 Chromium、VNC 等）
-docker build -f docker/runtime-image.Dockerfile -t verge-browser-runtime:latest .
+# 构建运行时镜像
+docker build -f docker/runtime-xvfb.Dockerfile -t verge-browser-runtime-xvfb:latest .
+docker build -f docker/runtime-xpra.Dockerfile -t verge-browser-runtime-xpra:latest .
 
 # 构建 API 服务器镜像（同时构建并打包管理页）
 docker build -f docker/api-server.Dockerfile -t verge-browser-api:latest .
@@ -247,7 +249,8 @@ PYTHONPATH=apps/api-server pytest
 运行运行时相关改动的推荐本地校验流程：
 
 ```bash
-docker build -f docker/runtime-image.Dockerfile -t verge-browser-runtime:latest .
+docker build -f docker/runtime-xvfb.Dockerfile -t verge-browser-runtime-xvfb:latest .
+docker build -f docker/runtime-xpra.Dockerfile -t verge-browser-runtime-xpra:latest .
 PYTHONPATH=apps/api-server pytest tests/unit tests/integration/test_runtime_api.py
 ```
 

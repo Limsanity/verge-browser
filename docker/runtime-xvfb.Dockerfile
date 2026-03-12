@@ -55,10 +55,10 @@ ENV XMODIFIERS="@im=fcitx" \
 
 RUN mkdir -p /workspace/downloads /workspace/uploads /workspace/browser-profile /var/log/sandbox /run/sandbox /opt/sandbox/scripts /root/.config/fcitx
 
-COPY apps/sandbox-runtime/scripts/ /opt/sandbox/scripts/
-COPY apps/sandbox-runtime/openbox/ /opt/sandbox/openbox/
-COPY apps/sandbox-runtime/supervisor/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-COPY apps/sandbox-runtime/fcitx/profile /root/.config/fcitx/profile
+COPY apps/runtime-xvfb/scripts/ /opt/sandbox/scripts/
+COPY apps/runtime-xvfb/openbox/ /opt/sandbox/openbox/
+COPY apps/runtime-xvfb/supervisor/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY apps/runtime-xvfb/fcitx/profile /root/.config/fcitx/profile
 
 RUN chmod +x /opt/sandbox/scripts/*.sh
 

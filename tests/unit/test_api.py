@@ -18,6 +18,11 @@ def body(response):
     return response.json()["data"]
 
 
+@pytest.fixture(autouse=True)
+def disable_docker_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.services.lifecycle.docker_adapter.is_available", lambda: False)
+
+
 def test_healthz() -> None:
     response = client.get("/healthz")
     assert response.status_code == 200
@@ -36,9 +41,10 @@ def test_create_and_get_sandbox() -> None:
     payload = body(created)
     sandbox_id = payload["id"]
     assert payload["alias"] is None
+    assert payload["kind"] == "xvfb_vnc"
     assert payload["browser"]["viewport"] == {"width": 1440, "height": 900}
     assert "cdp_url" not in payload["browser"]
-    assert "vnc_url" not in payload["browser"]
+    assert "session_url" not in payload["browser"]
     fetched = client.get(f"/sandbox/{sandbox_id}", headers=AUTH_HEADERS)
     assert fetched.status_code == 200
     assert body(fetched)["id"] == sandbox_id
@@ -102,21 +108,24 @@ def test_alias_cannot_match_existing_sandbox_id() -> None:
     assert second.json()["message"] == "alias already exists"
 
 
-def test_vnc_ticket_created_via_alias_works_with_canonical_entry_url() -> None:
-    created = client.post("/sandbox", json={"alias": "vnc-demo"}, headers=AUTH_HEADERS)
+def test_session_ticket_created_via_alias_works_with_canonical_entry_url() -> None:
+    created = client.post("/sandbox", json={"alias": "session-demo", "kind": "xpra"}, headers=AUTH_HEADERS)
     assert created.status_code == 201
     sandbox = body(created)
 
-    ticket = client.post("/sandbox/vnc-demo/vnc/apply", headers=AUTH_HEADERS)
+    ticket = client.post("/sandbox/session-demo/session/apply", headers=AUTH_HEADERS)
     assert ticket.status_code == 200
-
-    entry = client.get(f"/sandbox/{sandbox['id']}/vnc/", params={"ticket": body(ticket)["ticket"]}, follow_redirects=False)
-    assert entry.status_code == 302
-    assert entry.headers["location"] == f"/sandbox/{sandbox['id']}/vnc/vnc.html?path=/sandbox/{sandbox['id']}/vnc/websockify&resize=scale&autoconnect=true"
+    assert body(ticket)["session_url"].endswith(f"/sandbox/{sandbox['id']}/session/?ticket={body(ticket)['ticket']}")
 
 
-def test_vnc_ticket_requires_existing_sandbox() -> None:
-    response = client.post("/sandbox/sb_missing/vnc/apply", headers=AUTH_HEADERS)
+def test_create_sandbox_accepts_explicit_kind() -> None:
+    created = client.post("/sandbox", json={"alias": "xpra-demo", "kind": "xpra"}, headers=AUTH_HEADERS)
+    assert created.status_code == 201
+    assert body(created)["kind"] == "xpra"
+
+
+def test_session_ticket_requires_existing_sandbox() -> None:
+    response = client.post("/sandbox/sb_missing/session/apply", headers=AUTH_HEADERS)
     assert response.status_code == 404
 
 

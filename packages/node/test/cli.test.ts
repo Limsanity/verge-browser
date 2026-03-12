@@ -41,6 +41,7 @@ function sandboxResponse(overrides: Record<string, unknown> = {}) {
   return {
     id: 'sbx-1',
     alias: 'shopping',
+    kind: 'xvfb_vnc',
     status: 'RUNNING',
     created_at: '2026-03-12T00:00:00Z',
     updated_at: '2026-03-12T00:00:00Z',
@@ -99,6 +100,26 @@ test('sandbox update accepts metadata JSON', async () => {
 
   assert.equal(exitCode, 0);
   assert.deepEqual(JSON.parse(requestBody), { metadata: { owner: 'agent' } });
+});
+
+test('sandbox create forwards kind selection', async () => {
+  let requestBody = '';
+  const io = createIo();
+  const exitCode = await runCli({
+    argv: ['sandbox', 'create', '--kind', 'xpra', '--width', '1280', '--height', '720', '--json'],
+    io,
+    clientFactory: (options) => new VergeClient({
+      ...options,
+      token: 'token',
+      fetchImpl: async (_input, init) => {
+        requestBody = String(init?.body ?? '');
+        return createJsonResponse(201, envelope(sandboxResponse({ kind: 'xpra' }), 'sandbox created'));
+      },
+    }),
+  });
+
+  assert.equal(exitCode, 0);
+  assert.equal(JSON.parse(requestBody).kind, 'xpra');
 });
 
 test('browser actions reject missing payload', async () => {

@@ -37,6 +37,7 @@ interface GlobalOptions {
 
 interface SandboxOptions extends GlobalOptions {
   alias?: string;
+  kind?: 'xvfb_vnc' | 'xpra';
   width?: number;
   height?: number;
   defaultUrl?: string;
@@ -93,9 +94,16 @@ const defaultIo: CliIo = {
   stderr: { error: (message) => console.error(message) },
 };
 
-function parseDimensionOption(name: '--width' | '--height', value: number | undefined): number | undefined {
-  if (value === undefined) return undefined;
+function parseDimensionOption(name: '--width' | '--height', value: number | string | Array<number | string> | undefined | null): number | undefined {
+  if (Array.isArray(value)) {
+    if (value.length === 0) return undefined;
+    return parseDimensionOption(name, value[value.length - 1]);
+  }
+  if (value === undefined || value === null || value === '') return undefined;
   if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'number' && Number.isNaN(value)) return undefined;
+  if (typeof value === 'string' && value.trim() === '') return undefined;
+  if (typeof value === 'string' && Number.isFinite(Number(value))) return Number(value);
   throw new VergeConfigError(`option \`${name} <${name.slice(2)}>\` value is invalid`);
 }
 
@@ -159,8 +167,9 @@ function createCli(clientFactory: (options: VergeClientOptions) => VergeClient, 
 
   cli
     .command('sandbox <action> [idOrAlias]', 'Manage sandboxes')
-    .usage('verge-browser sandbox <list|ls|create|get|update|pause|resume|rm|cdp|vnc|restart> [idOrAlias] [options]')
+    .usage('verge-browser sandbox <list|ls|create|get|update|pause|resume|rm|cdp|session|restart> [idOrAlias] [options]')
     .option('--alias <alias>', 'Sandbox alias')
+    .option('--kind <kind>', 'Sandbox kind: xvfb_vnc or xpra')
     .option('--width <width>', 'Viewport width in pixels', { type: ['number'] })
     .option('--height <height>', 'Viewport height in pixels', { type: ['number'] })
     .option('--default-url <url>', 'Default browser URL')
@@ -177,6 +186,7 @@ function createCli(clientFactory: (options: VergeClientOptions) => VergeClient, 
         const metadata = parseJsonObjectOption('--metadata', options.metadata);
         return client.createSandbox({
           ...(options.alias ? { alias: options.alias } : {}),
+          ...(options.kind ? { kind: options.kind } : { kind: 'xvfb_vnc' }),
           ...(width !== undefined ? { width } : {}),
           ...(height !== undefined ? { height } : {}),
           ...(options.defaultUrl ? { default_url: options.defaultUrl } : {}),
@@ -203,7 +213,7 @@ function createCli(clientFactory: (options: VergeClientOptions) => VergeClient, 
       if (action === 'resume') return client.resumeSandbox(idOrAlias);
       if (action === 'rm') return client.deleteSandbox(idOrAlias);
       if (action === 'cdp') return client.getCdpInfo(idOrAlias);
-      if (action === 'vnc') return client.getVncUrl(idOrAlias);
+      if (action === 'session') return client.getSessionUrl(idOrAlias);
       if (action === 'restart') return client.restartBrowser(idOrAlias);
       throw new VergeConfigError(`unsupported sandbox command: ${action}`);
     });

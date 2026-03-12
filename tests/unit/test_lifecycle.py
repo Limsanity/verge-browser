@@ -50,7 +50,7 @@ async def test_restart_browser_waits_for_readiness(monkeypatch: pytest.MonkeyPat
     ok = await service.restart_browser("sb_test")
 
     assert ok is True
-    assert calls == [("sb_test", 30)]
+    assert calls == [("sb_test", 60)]
     updated = registry.get("sb_test")
     assert updated is not None
     assert updated.status == SandboxStatus.RUNNING

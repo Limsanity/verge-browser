@@ -8,11 +8,12 @@ import shutil
 from fastapi import HTTPException, status
 
 from app.config import get_settings
-from app.models.sandbox import RuntimeEndpoint, SandboxRecord, SandboxStatus, utcnow
+from app.models.sandbox import SandboxKind, RuntimeEndpoint, SandboxRecord, SandboxStatus, runtime_endpoint_for_kind, utcnow
 from app.schemas.sandbox import CreateSandboxRequest, UpdateSandboxRequest
 from app.services.browser import browser_service
 from app.services.docker_adapter import docker_adapter
 from app.services.registry import registry
+import httpx
 
 ALIAS_PATTERN = re.compile(r"^[a-zA-Z0-9](?:[a-zA-Z0-9_-]{0,62})$")
 
@@ -34,9 +35,11 @@ class SandboxLifecycleService:
         container_id = None
         host = "127.0.0.1"
         status = SandboxStatus.FAILED
+        runtime = runtime_endpoint_for_kind(req.kind)
         if docker_adapter.is_available():
             container_id, host = docker_adapter.create_container(
                 sandbox_id=sandbox_id,
+                kind=req.kind,
                 workspace_dir=workspace,
                 width=req.width,
                 height=req.height,
@@ -50,6 +53,7 @@ class SandboxLifecycleService:
         sandbox = SandboxRecord(
             id=sandbox_id,
             alias=alias,
+            kind=req.kind,
             status=status,
             updated_at=utcnow(),
             last_active_at=utcnow(),
@@ -61,7 +65,13 @@ class SandboxLifecycleService:
             uploads_dir=uploads,
             browser_profile_dir=profile,
             container_id=container_id,
-            runtime=RuntimeEndpoint(host=host),
+            runtime=RuntimeEndpoint(
+                host=host,
+                cdp_port=runtime.cdp_port,
+                session_port=runtime.session_port,
+                display=runtime.display,
+                browser_debug_port=runtime.browser_debug_port,
+            ),
             metadata=metadata,
         )
         registry.put(sandbox)
@@ -106,7 +116,12 @@ class SandboxLifecycleService:
         sandbox.status = SandboxStatus.STOPPED
         sandbox.updated_at = utcnow()
         sandbox.last_active_at = sandbox.updated_at
+        runtime = runtime_endpoint_for_kind(sandbox.kind)
         sandbox.runtime.host = "127.0.0.1"
+        sandbox.runtime.session_port = runtime.session_port
+        sandbox.runtime.display = runtime.display
+        sandbox.runtime.cdp_port = runtime.cdp_port
+        sandbox.runtime.browser_debug_port = runtime.browser_debug_port
         sandbox.metadata.pop("runtime_error", None)
         registry.put(sandbox)
         return True
@@ -123,6 +138,7 @@ class SandboxLifecycleService:
             return False
         container_id, host = docker_adapter.create_container(
             sandbox_id=sandbox.id,
+            kind=sandbox.kind,
             workspace_dir=sandbox.workspace_dir,
             width=sandbox.width,
             height=sandbox.height,
@@ -180,6 +196,7 @@ class SandboxLifecycleService:
 
             container_id, host = docker_adapter.create_container(
                 sandbox_id=sandbox.id,
+                kind=sandbox.kind,
                 workspace_dir=sandbox.workspace_dir,
                 width=sandbox.width,
                 height=sandbox.height,
@@ -214,18 +231,51 @@ class SandboxLifecycleService:
             except Exception:
                 window = {"window_viewport": {"width": 0}}
             if version.get("webSocketDebuggerUrl") and window["window_viewport"]["width"] > 0:
-                sandbox.status = SandboxStatus.RUNNING
-                sandbox.updated_at = utcnow()
-                sandbox.last_active_at = sandbox.updated_at
-                registry.put(sandbox)
-                return
+                if await self._session_ready(sandbox) and self._display_ready(sandbox):
+                    sandbox.status = SandboxStatus.RUNNING
+                    sandbox.updated_at = utcnow()
+                    sandbox.last_active_at = sandbox.updated_at
+                    sandbox.metadata.pop("runtime_error", None)
+                    sandbox.metadata.pop("xpra_error", None)
+                    sandbox.metadata.pop("display", None)
+                    registry.put(sandbox)
+                    return
             await asyncio.sleep(1)
         sandbox = registry.get(sandbox_id)
         if sandbox is not None:
             sandbox.status = SandboxStatus.DEGRADED
             sandbox.metadata["runtime_error"] = "sandbox readiness timed out"
+            sandbox.metadata["display"] = sandbox.runtime.display
+            if not self._display_ready(sandbox):
+                sandbox.metadata["xpra_error"] = "xpra display unavailable"
+            elif not await self._session_ready(sandbox):
+                sandbox.metadata["xpra_error"] = "xpra session service unavailable"
             sandbox.updated_at = utcnow()
             registry.put(sandbox)
+
+    def _display_ready(self, sandbox: SandboxRecord) -> bool:
+        if not sandbox.container_id:
+            return False
+        if sandbox.kind == SandboxKind.XPRA:
+            proc = docker_adapter.exec_shell(
+                sandbox.container_id,
+                f'export DISPLAY="{sandbox.runtime.display}"; xdpyinfo -display "{sandbox.runtime.display}" >/dev/null 2>&1 && xpra info --display="{sandbox.runtime.display}" >/dev/null 2>&1',
+            )
+            return proc.returncode == 0
+        proc = docker_adapter.exec_shell(
+            sandbox.container_id,
+            f'export DISPLAY="{sandbox.runtime.display}"; xdpyinfo -display "{sandbox.runtime.display}" >/dev/null 2>&1',
+        )
+        return proc.returncode == 0
+
+    async def _session_ready(self, sandbox: SandboxRecord) -> bool:
+        path = "/" if sandbox.kind == SandboxKind.XPRA else "/vnc.html"
+        try:
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                response = await client.get(f"http://{sandbox.runtime.host}:{sandbox.runtime.session_port}{path}")
+                return response.status_code < 500
+        except Exception:
+            return False
 
     def _normalize_alias(self, alias: str | None, *, sandbox_id: str | None) -> str | None:
         if alias is None:

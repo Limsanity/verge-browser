@@ -12,14 +12,16 @@ from app.schemas.sandbox import CreateCdpTicketRequest, CreateCdpTicketResponse
 from app.services.cdp_access import canonical_sandbox_id, issue_cdp_ticket_response
 from app.services.browser import browser_service
 
-router = APIRouter(prefix="/sandbox/{sandbox_id}", tags=["browser"], dependencies=[Depends(get_current_subject)])
+router = APIRouter(prefix="/sandbox/{sandbox_id}", tags=["browser"])
 
 
 @router.post("/browser/screenshot", response_model=ApiEnvelope[ScreenshotEnvelope])
 async def screenshot(
     payload: ScreenshotRequest,
+    subject: str = Depends(get_current_subject),
     sandbox=Depends(require_sandbox),
 ) -> ApiEnvelope[ScreenshotEnvelope]:
+    del subject
     return ok(
         await browser_service.screenshot(
             sandbox,
@@ -32,7 +34,12 @@ async def screenshot(
 
 
 @router.post("/browser/actions", response_model=ApiEnvelope[BrowserActionsResponse])
-async def browser_actions(payload: BrowserActionsRequest, sandbox=Depends(require_sandbox)) -> ApiEnvelope[BrowserActionsResponse]:
+async def browser_actions(
+    payload: BrowserActionsRequest,
+    subject: str = Depends(get_current_subject),
+    sandbox=Depends(require_sandbox),
+) -> ApiEnvelope[BrowserActionsResponse]:
+    del subject
     return ok(await browser_service.execute_actions(sandbox, payload))
 
 

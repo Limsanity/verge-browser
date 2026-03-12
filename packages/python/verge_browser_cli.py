@@ -30,6 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     create = sandbox_subparsers.add_parser("create")
     create.add_argument("--alias", default=None)
+    create.add_argument("--kind", default="xvfb_vnc", choices=["xvfb_vnc", "xpra"])
     create.add_argument("--width", type=int, default=1280)
     create.add_argument("--height", type=int, default=1024)
     create.add_argument("--default-url", default=None)
@@ -42,7 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
     update.add_argument("id_or_alias")
     update.add_argument("--alias", required=True)
 
-    for name in ("pause", "resume", "rm", "cdp", "vnc"):
+    for name in ("pause", "resume", "rm", "cdp", "session"):
         cmd = sandbox_subparsers.add_parser(name)
         cmd.add_argument("id_or_alias")
 
@@ -87,6 +88,7 @@ def _dispatch(client: VergeClient, args: argparse.Namespace) -> Any:
     if args.sandbox_command == "create":
         return client.create_sandbox(
             alias=args.alias,
+            kind=args.kind,
             width=args.width,
             height=args.height,
             default_url=args.default_url,
@@ -104,8 +106,8 @@ def _dispatch(client: VergeClient, args: argparse.Namespace) -> Any:
         return client.delete_sandbox(args.id_or_alias)
     if args.sandbox_command == "cdp":
         return client.get_cdp_info(args.id_or_alias)
-    if args.sandbox_command == "vnc":
-        return client.get_vnc_url(args.id_or_alias)
+    if args.sandbox_command == "session":
+        return client.get_session_url(args.id_or_alias)
     raise VergeConfigError(f"unsupported sandbox command: {args.sandbox_command}")
 
 
