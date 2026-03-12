@@ -172,7 +172,7 @@ export function App() {
   }
 
   async function runAction(
-    action: "pause" | "resume" | "delete" | "vnc",
+    action: "pause" | "resume" | "delete" | "vnc" | "cdp",
     sandbox: Sandbox,
   ) {
     setIsActionLoading(true);
@@ -192,6 +192,17 @@ export function App() {
         );
         window.open(ticket.vnc_url, "_blank", "noopener,noreferrer");
         toast.success("VNC session opened");
+      } else if (action === "cdp") {
+        const ticket = await api<{ ticket: string; cdp_url: string }>(
+          `/sandbox/${sandbox.id}/cdp/apply`,
+          token,
+          {
+            method: "POST",
+            body: JSON.stringify({ mode: "reusable" }),
+          },
+        );
+        await navigator.clipboard.writeText(ticket.cdp_url);
+        toast.success("CDP URL copied to clipboard");
       } else {
         await api(`/sandbox/${sandbox.id}/${action}`, token, {
           method: "POST",
@@ -346,10 +357,6 @@ export function App() {
                   <label>Updated</label>
                   <p>{new Date(selected.updated_at).toLocaleString()}</p>
                 </div>
-                <div>
-                  <label>CDP</label>
-                  <p className="mono">{selected.browser.cdp_url}</p>
-                </div>
               </div>
 
               <div className="action-row">
@@ -370,6 +377,12 @@ export function App() {
                   disabled={isActionLoading}
                 >
                   Open VNC
+                </button>
+                <button
+                  onClick={() => void runAction("cdp", selected)}
+                  disabled={isActionLoading}
+                >
+                  Connect CDP
                 </button>
                 <button
                   className="danger"
