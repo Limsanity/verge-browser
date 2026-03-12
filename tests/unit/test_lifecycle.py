@@ -112,6 +112,35 @@ async def test_restart_browser_returns_false_when_readiness_times_out(monkeypatc
 
 
 @pytest.mark.asyncio
+async def test_wait_until_ready_records_generic_readiness_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    service = SandboxLifecycleService()
+    sandbox = _sandbox()
+    registry.put(sandbox)
+
+    async def fake_browser_version(current):
+        del current
+        return {"webSocketDebuggerUrl": "ws://127.0.0.1:9223/devtools/browser/1"}
+
+    monkeypatch.setattr("app.services.lifecycle.browser_service.browser_version", fake_browser_version)
+    monkeypatch.setattr(
+        "app.services.lifecycle.browser_service.get_viewport",
+        lambda current: {"window_viewport": {"width": 1280}},
+    )
+    monkeypatch.setattr(service, "_display_ready", lambda current: False)
+    monkeypatch.setattr(service, "_session_ready", lambda current: True)
+
+    await service._wait_until_ready("sb_test", timeout_sec=0)
+
+    updated = registry.get("sb_test")
+    assert updated is not None
+    assert updated.status == SandboxStatus.DEGRADED
+    assert updated.metadata["display_error"] == "display unavailable"
+    assert "session_error" not in updated.metadata
+    assert "xpra_error" not in updated.metadata
+    registry.delete("sb_test")
+
+
+@pytest.mark.asyncio
 async def test_restart_browser_recreates_container_after_removing_stale_runtime(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

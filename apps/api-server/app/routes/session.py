@@ -119,7 +119,14 @@ async def session_entry(
         from fastapi.responses import RedirectResponse
 
         response = RedirectResponse(url=session_service.browser_session_redirect_url(sandbox), status_code=302)
-    response.set_cookie("sandbox_session", session_id, httponly=True, max_age=600, samesite="lax")
+    response.set_cookie(
+        "sandbox_session",
+        session_id,
+        httponly=True,
+        max_age=600,
+        samesite="lax",
+        path=f"/sandbox/{canonical_id}/session",
+    )
     return response
 
 

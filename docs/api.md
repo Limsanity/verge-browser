@@ -270,15 +270,25 @@ Response `data`:
 
 ### `GET /sandbox/{sandbox_id}/session/?ticket=...`
 
-Validate the ticket, mint a short-lived sandbox session cookie, and return the proxied Xpra HTML5 entry page.
+Validate the ticket, mint a short-lived sandbox session cookie scoped to that sandbox, and return the runtime entry page.
+- `xpra`: returns the proxied Xpra HTML5 entry page.
+- `xvfb_vnc`: redirects to the proxied noVNC entry page.
 
 ### `GET /sandbox/{sandbox_id}/session/{asset_path}`
 
-Proxy Xpra HTML5 static assets after session validation.
+Proxy runtime static assets after session validation.
 
 ### `WS /sandbox/{sandbox_id}/session/ws`
 
 Proxy the Xpra session WebSocket after session validation.
+
+### `WS /sandbox/{sandbox_id}/session/`
+
+Alias of `/session/ws` for Xpra clients that connect on the session root path.
+
+### `WS /sandbox/{sandbox_id}/session/websockify`
+
+Proxy the noVNC/websockify WebSocket for `xvfb_vnc` sandboxes after session validation.
 
 ## Files
 

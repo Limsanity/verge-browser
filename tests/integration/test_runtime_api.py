@@ -136,10 +136,10 @@ def test_runtime_browser_endpoints(docker_runtime_ready: None, clean_sandbox_bas
 
         session_entry = client.get(f"/sandbox/{sandbox_id}/session/?ticket={ticket}")
         assert session_entry.status_code == 200
-        assert "sandbox_session" in session_entry.cookies
+        assert client.cookies.get("sandbox_session")
         session_asset = client.get(
             f"/sandbox/{sandbox_id}/session/vnc.html",
-            cookies=session_entry.cookies,
+            cookies=client.cookies,
         )
         assert session_asset.status_code == 200
         assert "noVNC" in session_asset.text or "RFB" in session_asset.text
@@ -211,11 +211,11 @@ def test_xpra_session_assets_open(docker_runtime_xpra_ready: None, clean_sandbox
 
         session_entry = client.get(f"/sandbox/{sandbox_id}/session/?ticket={ticket}")
         assert session_entry.status_code == 200
-        assert "sandbox_session" in session_entry.cookies
+        assert client.cookies.get("sandbox_session")
 
         session_asset = client.get(
             f"/sandbox/{sandbox_id}/session/js/lib/jquery-ui.js",
-            cookies=session_entry.cookies,
+            cookies=client.cookies,
         )
         assert session_asset.status_code == 200
         assert "jQuery UI" in session_asset.text

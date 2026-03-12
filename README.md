@@ -187,7 +187,7 @@ For convenience, use the provided compose file:
 
 ```bash
 export PROJECT_ROOT="$PWD"
-docker compose -f deployments/docker-compose.yml build api
+docker compose -f deployments/docker-compose.yml build api runtime-xvfb runtime-xpra
 docker compose -f deployments/docker-compose.yml up api
 ```
 
@@ -293,13 +293,9 @@ export AUTH_TOKEN="<admin-token>"
 
 ## Runtime Image
 
-The runtime image hosts:
+The runtime images host:
 
 - Chromium
-- Xvfb
-- Openbox
-- x11vnc
-- noVNC / websockify
 - xdotool
 - supervisor
 
@@ -310,7 +306,7 @@ Two runtime variants are supported:
 - `xvfb_vnc`
   Xvfb + x11vnc + noVNC / websockify
 - `xpra`
-  Xpra HTML5 session
+  Xpra server + HTML5 client assets
 
 ## API Surface
 

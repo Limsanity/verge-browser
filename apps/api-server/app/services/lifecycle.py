@@ -19,6 +19,9 @@ ALIAS_PATTERN = re.compile(r"^[a-zA-Z0-9](?:[a-zA-Z0-9_-]{0,62})$")
 
 
 class SandboxLifecycleService:
+    display_error_key = "display_error"
+    session_error_key = "session_error"
+
     async def create(self, req: CreateSandboxRequest) -> SandboxRecord:
         settings = get_settings()
         sandbox_id = f"sb_{secrets.token_hex(6)}"
@@ -131,6 +134,9 @@ class SandboxLifecycleService:
         sandbox.runtime.cdp_port = runtime.cdp_port
         sandbox.runtime.browser_debug_port = runtime.browser_debug_port
         sandbox.metadata.pop("runtime_error", None)
+        sandbox.metadata.pop(self.display_error_key, None)
+        sandbox.metadata.pop(self.session_error_key, None)
+        sandbox.metadata.pop("xpra_error", None)
         registry.put(sandbox)
         return True
 
@@ -174,6 +180,9 @@ class SandboxLifecycleService:
         sandbox.updated_at = utcnow()
         sandbox.last_active_at = sandbox.updated_at
         sandbox.metadata.pop("runtime_error", None)
+        sandbox.metadata.pop(self.display_error_key, None)
+        sandbox.metadata.pop(self.session_error_key, None)
+        sandbox.metadata.pop("xpra_error", None)
         registry.put(sandbox)
         settings = get_settings()
         await self._wait_until_ready(sandbox_id, timeout_sec=settings.sandbox_start_timeout_sec)
@@ -255,6 +264,8 @@ class SandboxLifecycleService:
                     sandbox.updated_at = utcnow()
                     sandbox.last_active_at = sandbox.updated_at
                     sandbox.metadata.pop("runtime_error", None)
+                    sandbox.metadata.pop(self.display_error_key, None)
+                    sandbox.metadata.pop(self.session_error_key, None)
                     sandbox.metadata.pop("xpra_error", None)
                     sandbox.metadata.pop("display", None)
                     registry.put(sandbox)
@@ -265,10 +276,13 @@ class SandboxLifecycleService:
             sandbox.status = SandboxStatus.DEGRADED
             sandbox.metadata["runtime_error"] = "sandbox readiness timed out"
             sandbox.metadata["display"] = sandbox.runtime.display
+            sandbox.metadata.pop(self.display_error_key, None)
+            sandbox.metadata.pop(self.session_error_key, None)
+            sandbox.metadata.pop("xpra_error", None)
             if not self._display_ready(sandbox):
-                sandbox.metadata["xpra_error"] = "xpra display unavailable"
+                sandbox.metadata[self.display_error_key] = "display unavailable"
             elif not await self._session_ready(sandbox):
-                sandbox.metadata["xpra_error"] = "xpra session service unavailable"
+                sandbox.metadata[self.session_error_key] = "session service unavailable"
             sandbox.updated_at = utcnow()
             registry.put(sandbox)
 

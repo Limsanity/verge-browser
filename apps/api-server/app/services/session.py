@@ -9,6 +9,9 @@ from app.models.sandbox import SandboxKind, SandboxRecord, SandboxStatus
 
 
 class SessionService:
+    xpra_ws_path = "/"
+    xvfb_ws_path = "/websockify"
+
     def build_entry_url(self, *, base_url: str, sandbox_id: str, ticket: str) -> str:
         return f"{base_url}/sandbox/{sandbox_id}/session/?{urlencode({'ticket': ticket})}"
 
@@ -21,7 +24,7 @@ class SessionService:
         return url
 
     def upstream_ws_url(self, sandbox: SandboxRecord, query: str | None = None) -> str:
-        path = "/" if sandbox.kind == SandboxKind.XPRA else "/websockify"
+        path = self.xpra_ws_path if sandbox.kind == SandboxKind.XPRA else self.xvfb_ws_path
         url = f"ws://{sandbox.runtime.host}:{sandbox.runtime.session_port}{path}"
         if query:
             url = f"{url}?{query}"
