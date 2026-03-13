@@ -31,6 +31,13 @@
 
 Verge Browser 的目标，就是把浏览器、GUI 和文件都放进同一个隔离沙箱里，避免工作流被拆散到多个系统中。
 
+## Agent Skills
+
+仓库现在已经内置面向 AI Agent 的 skills，位于 [`skills/`](./skills)：
+
+- [`skills/verge-browser-deploy`](./skills/verge-browser-deploy)：用于部署 Verge Browser、配置环境变量、验证服务健康状态以及排查启动问题
+- [`skills/verge-browser-usage`](./skills/verge-browser-usage)：用于在服务已经部署好的前提下管理沙盒，并结合 `agent-browser` 做自动化
+
 ## 快速开始
 
 ### 方式一：Docker Compose（推荐）

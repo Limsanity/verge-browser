@@ -31,6 +31,13 @@ Most browser automation systems focus on headless page control. That is not enou
 
 Verge Browser keeps browser, GUI, and files in one isolated sandbox so those workflows remain continuous instead of split across multiple tools.
 
+## Agent Skills
+
+This repository now ships built-in skills for AI agents under [`skills/`](./skills):
+
+- [`skills/verge-browser-deploy`](./skills/verge-browser-deploy): deploy Verge Browser, configure env vars, verify health, and troubleshoot startup issues
+- [`skills/verge-browser-usage`](./skills/verge-browser-usage): operate an already deployed Verge Browser service, manage sandboxes, and combine it with `agent-browser`
+
 ## Quick Start
 
 ### Option 1: Docker Compose (Recommended)
