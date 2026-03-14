@@ -62,6 +62,7 @@ Request:
   "default_url": "https://example.com",
   "width": 1440,
   "height": 900,
+  "gpu_mode": "software",
   "metadata": {
     "purpose": "manual-test"
   }
@@ -73,6 +74,10 @@ Response notes:
 - Creation and detail responses no longer expose `cdp_url` or `session_url`
 - Browser runtime info is aggregated under `data.browser`
 - `kind` selects the runtime stack: `xvfb_vnc` or `xpra`
+- `gpu_mode` selects the rendering engine:
+  - `disabled`: No GPU acceleration (default)
+  - `software`: SwiftShader (CPU-based WebGL, high compatibility)
+  - `hardware`: DRI passthrough (GPU-based WebGL, requires Linux host with `/dev/dri`)
 - If `image` is omitted, the server picks the default image for the selected `kind`
 
 ### `GET /sandbox`
@@ -96,6 +101,7 @@ Example `data` payload:
   "last_active_at": "2026-03-12T10:00:05Z",
   "width": 1440,
   "height": 900,
+  "gpu_mode": "software",
   "metadata": {},
   "container_id": "docker-container-id",
   "browser": {

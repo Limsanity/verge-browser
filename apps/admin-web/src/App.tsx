@@ -28,7 +28,7 @@ type Sandbox = {
   last_active_at: string;
   width: number;
   height: number;
-  enable_gpu: boolean;
+  gpu_mode: "disabled" | "software" | "hardware";
   metadata: Record<string, unknown>;
   browser: {
     browser_version?: string | null;
@@ -169,7 +169,7 @@ export function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [createAlias, setCreateAlias] = useState("");
   const [createKind, setCreateKind] = useState<"xvfb_vnc" | "xpra">("xvfb_vnc");
-  const [createEnableGpu, setCreateEnableGpu] = useState(false);
+  const [createGpuMode, setCreateGpuMode] = useState<"disabled" | "software" | "hardware">("disabled");
   const [isActionLoading, setIsActionLoading] = useState(false);
 
   const {
@@ -204,7 +204,7 @@ export function App() {
           kind: createKind,
           width: 1280,
           height: 1024,
-          enable_gpu: createEnableGpu,
+          gpu_mode: createGpuMode,
         }),
       });
       setCreateAlias("");
@@ -332,14 +332,18 @@ export function App() {
                   <option value="xvfb_vnc">xvfb + vnc</option>
                   <option value="xpra">xpra</option>
                 </select>
-                <label className="gpu-label">
-                  <input
-                    type="checkbox"
-                    checked={createEnableGpu}
-                    onChange={(e) => setCreateEnableGpu(e.target.checked)}
-                  />
-                  GPU
-                </label>
+                <select
+                  className="select"
+                  value={createGpuMode}
+                  onChange={(event) =>
+                    setCreateGpuMode(event.target.value as "disabled" | "software" | "hardware")
+                  }
+                >
+                  <option value="disabled">GPU: Disabled</option>
+                  <option value="software">GPU: Software</option>
+                  <option value="hardware">GPU: Hardware</option>
+                </select>
+
                 <button
             className="create-btn"
             onClick={() => void createSandbox()}
@@ -420,8 +424,8 @@ export function App() {
                   </p>
                 </div>
                 <div>
-                  <label>GPU</label>
-                  <p>{selected.enable_gpu ? "Enabled" : "Disabled"}</p>
+                  <label>GPU Mode</label>
+                  <p>{selected.gpu_mode}</p>
                 </div>
                 <div>
                   <label>Created</label>

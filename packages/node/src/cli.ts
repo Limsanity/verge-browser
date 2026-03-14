@@ -40,6 +40,7 @@ interface SandboxOptions extends GlobalOptions {
   kind?: "xvfb_vnc" | "xpra";
   width?: number;
   height?: number;
+  gpuMode?: "disabled" | "software" | "hardware";
   enableGpu?: boolean;
   defaultUrl?: string;
   image?: string;
@@ -195,7 +196,8 @@ function createCli(
       type: ["number"],
     })
     .option("--default-url <url>", "Default browser URL")
-    .option("--enable-gpu", "Enable GPU acceleration (WebGL)")
+    .option("--gpu-mode <mode>", "GPU mode: disabled, software, hardware", { default: "disabled" })
+    .option("--enable-gpu", "(Deprecated) Enable software GPU acceleration")
     .option("--image <image>", "Runtime image override")
     .option("--metadata <json>", "Sandbox metadata as JSON object")
     .action(
@@ -221,6 +223,7 @@ function createCli(
             ...(width !== undefined ? { width } : {}),
             ...(height !== undefined ? { height } : {}),
             ...(options.defaultUrl ? { default_url: options.defaultUrl } : {}),
+            ...(options.gpuMode ? { gpu_mode: options.gpuMode } : { gpu_mode: "disabled" }),
             ...(options.enableGpu !== undefined ? { enable_gpu: options.enableGpu } : {}),
             ...(options.image ? { image: options.image } : {}),
             ...(metadata ? { metadata } : {}),

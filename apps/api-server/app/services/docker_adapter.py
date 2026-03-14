@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.config import get_settings
-from app.models.sandbox import SandboxKind
+from app.models.sandbox import GpuMode, SandboxKind
 
 
 @dataclass(frozen=True)
@@ -60,7 +60,7 @@ class DockerAdapter:
         height: int,
         default_url: str | None,
         image: str | None,
-        enable_gpu: bool = False,
+        gpu_mode: GpuMode = GpuMode.DISABLED,
     ) -> ContainerCreateResult:
         settings = get_settings()
         image_name = image or settings.runtime_image_for_kind(kind)
@@ -70,7 +70,8 @@ class DockerAdapter:
         display = settings.display_for_kind(kind)
         session_port = settings.session_port_for_kind(kind)
         
-        shm_size = "2g" if enable_gpu else "1g"
+        # Increase shm_size for GPU/WebGL modes
+        shm_size = "2g" if gpu_mode != GpuMode.DISABLED else "1g"
         
         cmd = [
             "docker",
@@ -96,13 +97,13 @@ class DockerAdapter:
             "-e",
             f"DEFAULT_URL={default_url or settings.sandbox_default_url}",
             "-e",
-            f"GPU_ENABLED={'true' if enable_gpu else 'false'}",
+            f"GPU_MODE={gpu_mode}",
             "-v",
             f"{workspace_dir}:/workspace",
         ]
         
-        if enable_gpu and platform.system() == "Linux":
-            # Passthrough DRI devices for hardware acceleration on Linux if available
+        # Passthrough DRI devices for hardware acceleration on Linux if requested
+        if gpu_mode == GpuMode.HARDWARE and platform.system() == "Linux":
             if Path("/dev/dri").exists():
                 cmd.extend(["--device", "/dev/dri:/dev/dri"])
             

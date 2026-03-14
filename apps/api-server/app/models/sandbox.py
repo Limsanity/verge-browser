@@ -27,6 +27,12 @@ class SandboxKind(StrEnum):
     XPRA = "xpra"
 
 
+class GpuMode(StrEnum):
+    DISABLED = "disabled"
+    SOFTWARE = "software"
+    HARDWARE = "hardware"
+
+
 class RuntimeEndpoint(BaseModel):
     host: str = "127.0.0.1"
     cdp_port: int = 9223
@@ -51,7 +57,7 @@ class SandboxRecord(BaseModel):
     last_active_at: datetime = Field(default_factory=utcnow)
     width: int = 1280
     height: int = 1024
-    enable_gpu: bool = False
+    gpu_mode: GpuMode = GpuMode.DISABLED
     image: str | None = None
     workspace_dir: Path
     downloads_dir: Path

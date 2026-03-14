@@ -35,6 +35,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfontconfig1 \
     libgl1-mesa-dri \
     libglapi-mesa \
+    libgbm1 \
     libosmesa6 \
     mesa-utils \
     fcitx5 \

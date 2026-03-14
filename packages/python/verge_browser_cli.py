@@ -37,6 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
     create.add_argument("--kind", default="xvfb_vnc", choices=["xvfb_vnc", "xpra"])
     create.add_argument("--width", type=int, default=1280)
     create.add_argument("--height", type=int, default=1024)
+    create.add_argument("--gpu-mode", choices=["disabled", "software", "hardware"], default="disabled")
     create.add_argument("--enable-gpu", action="store_true", default=False)
     create.add_argument("--default-url", default=None)
     create.add_argument("--image", default=None)
@@ -194,15 +195,17 @@ def _dispatch(client: VergeClient, args: argparse.Namespace) -> Any:
     if args.sandbox_command == "list":
         return client.list_sandboxes()
     if args.sandbox_command == "create":
-        return client.create_sandbox(
+        res = client.create_sandbox(
             alias=args.alias,
             kind=args.kind,
             width=args.width,
             height=args.height,
+            gpu_mode=args.gpu_mode,
             enable_gpu=args.enable_gpu,
             default_url=args.default_url,
             image=args.image,
         )
+
     if args.sandbox_command == "get":
         return client.get_sandbox(args.id_or_alias)
     if args.sandbox_command == "update":

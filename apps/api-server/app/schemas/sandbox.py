@@ -1,9 +1,9 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
-from app.models.sandbox import SandboxKind, SandboxStatus
+from app.models.sandbox import GpuMode, SandboxKind, SandboxStatus
 
 
 class CreateSandboxRequest(BaseModel):
@@ -13,8 +13,15 @@ class CreateSandboxRequest(BaseModel):
     default_url: str | None = None
     width: int = Field(default=1280, ge=320, le=7680)
     height: int = Field(default=1024, ge=240, le=4320)
-    enable_gpu: bool = False
+    gpu_mode: GpuMode = GpuMode.DISABLED
+    enable_gpu: bool | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def migrate_gpu_settings(self) -> "CreateSandboxRequest":
+        if self.enable_gpu is True and self.gpu_mode == GpuMode.DISABLED:
+            self.gpu_mode = GpuMode.SOFTWARE
+        return self
 
 
 class UpdateSandboxRequest(BaseModel):
@@ -61,7 +68,7 @@ class SandboxResponse(BaseModel):
     last_active_at: datetime
     width: int
     height: int
-    enable_gpu: bool = False
+    gpu_mode: GpuMode = GpuMode.DISABLED
     metadata: dict[str, Any] = Field(default_factory=dict)
     browser: BrowserRuntimeInfo
     container_id: str | None = None

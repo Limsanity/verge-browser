@@ -86,6 +86,7 @@ These variables are used by the runtime images or injected by the API server whe
 | `BROWSER_WINDOW_WIDTH`  | All        | API server | Browser window width.                                       |
 | `BROWSER_WINDOW_HEIGHT` | All        | API server | Browser window height.                                      |
 | `DEFAULT_URL`           | All        | API server | Initial browser URL.                                        |
+| `GPU_MODE`             | All        | API server | GPU mode: `disabled`, `software`, or `hardware`.            |
 | `XPRA_DISPLAY`          | `xpra`     | API server | Xpra display.                                               |
 | `XPRA_PORT`             | `xpra`     | API server | Xpra HTML5 service port.                                    |
 | `XVFB_WHD`              | `xvfb_vnc` | API server | Xvfb screen geometry and depth, for example `1280x1024x24`. |

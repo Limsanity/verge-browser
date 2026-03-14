@@ -46,18 +46,34 @@ class VergeClient:
         kind: str = "xvfb_vnc",
         width: int = 1280,
         height: int = 1024,
-        enable_gpu: bool = False,
+        gpu_mode: str = "disabled",
+        enable_gpu: bool | None = None,
         default_url: str | None = None,
         image: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """
+        Create a new sandbox.
+        
+        :param alias: Optional alias for the sandbox.
+        :param kind: Kind of sandbox ('xvfb_vnc' or 'xpra').
+        :param image: Custom docker image to use.
+        :param default_url: Default URL to open in the browser.
+        :param width: Browser window width.
+        :param height: Browser window height.
+        :param gpu_mode: GPU acceleration mode ('disabled', 'software', 'hardware').
+        :param enable_gpu: (Deprecated) Set to True for software WebGL.
+        :param metadata: Optional metadata for the sandbox.
+        """
         payload: dict[str, Any] = {
             "kind": kind,
             "width": width,
             "height": height,
-            "enable_gpu": enable_gpu,
+            "gpu_mode": gpu_mode,
             "metadata": metadata or {},
         }
+        if enable_gpu is not None:
+            payload["enable_gpu"] = enable_gpu
         if alias is not None:
             payload["alias"] = alias
         if default_url is not None:

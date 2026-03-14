@@ -24,13 +24,20 @@ until xdpyinfo -display "${DISPLAY_NUM}" >/dev/null 2>&1 || [ "${COUNT}" -eq "${
 done
 
 GPU_FLAGS=("--disable-gpu")
-if [ "${GPU_ENABLED:-false}" = "true" ]; then
+if [ "${GPU_MODE:-disabled}" = "software" ]; then
   GPU_FLAGS=(
     "--ignore-gpu-blocklist"
     "--enable-webgl"
     "--enable-webgl2"
     "--use-gl=angle"
     "--use-angle=swiftshader"
+  )
+elif [ "${GPU_MODE:-disabled}" = "hardware" ]; then
+  GPU_FLAGS=(
+    "--ignore-gpu-blocklist"
+    "--enable-webgl"
+    "--enable-webgl2"
+    "--use-gl=egl"
   )
 fi
 

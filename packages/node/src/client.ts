@@ -55,7 +55,7 @@ export interface SandboxResponse {
   last_active_at: string;
   width: number;
   height: number;
-  enable_gpu: boolean;
+  gpu_mode: "disabled" | "software" | "hardware";
   metadata: JsonObject;
   browser: BrowserInfo;
   container_id?: string | null;
@@ -82,6 +82,8 @@ export interface CreateSandboxPayload {
   kind?: SandboxKind;
   width?: number;
   height?: number;
+  gpu_mode?: "disabled" | "software" | "hardware";
+  /** @deprecated Use gpu_mode instead */
   enable_gpu?: boolean;
   default_url?: string;
   image?: string;
